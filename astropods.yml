@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://astropods.com/schema/package.json
+spec: package/v1
+name: "@postman/quill"
+
+agent:
+  build: { context: ., dockerfile: Dockerfile }
+  interfaces:
+    messaging: true
+  inputs:
+    - name: TAVILY_API_KEY
+      datatype: string
+      secret: true
+      description: Tavily Search API key for blog topic research
+    - name: WP_USERNAME
+      datatype: string
+      secret: true
+      description: WordPress username for blog.postman.com
+    - name: WP_APP_PASSWORD
+      datatype: string
+      secret: true
+      description: WordPress application password (generate at blog.postman.com/wp-admin/profile.php under Application Passwords)
+    - name: CONFLUENCE_BASE_URL
+      datatype: string
+      secret: false
+      description: Confluence wiki base URL, e.g. https://yourorg.atlassian.net/wiki (no trailing slash)
+    - name: CONFLUENCE_EMAIL
+      datatype: string
+      secret: false
+      description: Email address of the user whose API token Quill uses
+    - name: CONFLUENCE_API_TOKEN
+      datatype: string
+      secret: true
+      description: Confluence API token (generate at id.atlassian.com → Security → Create and manage API tokens)
+    - name: CONFLUENCE_SPACE_KEY
+      datatype: string
+      secret: false
+      description: Default Confluence space key where Quill creates blog draft pages (e.g. DEVREL)
+    - name: CONFLUENCE_PARENT_PAGE_ID
+      datatype: string
+      secret: false
+      description: Optional parent page ID to nest blog drafts under (numeric). Defaults to space root if unset.
+
+models:
+  anthropic:
+    provider: anthropic
+
+dev:
+  interfaces:
+    messaging:
+      adapters: [web]
+  command: bun --watch run agent/index.ts

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+bun.lockb
+
+# Astropods local state
+.ast/
+
+# Credentials / secrets — never commit
+*service-account*.json
+*credentials*.json
+*-key.json
+secrets/
+gcloud/

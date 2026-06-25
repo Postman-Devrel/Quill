@@ -1,0 +1,206 @@
+import { marked } from 'marked';
+import TurndownService from 'turndown';
+
+interface ConfluenceConfig {
+  baseUrl: string;
+  authHeader: string;
+}
+
+function getConfluenceConfig(): ConfluenceConfig {
+  const baseUrl = process.env.CONFLUENCE_BASE_URL;
+  const email = process.env.CONFLUENCE_EMAIL;
+  const token = process.env.CONFLUENCE_API_TOKEN;
+  if (!baseUrl || !email || !token) {
+    throw new Error(
+      'Confluence not configured. Set CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN via: ast project configure',
+    );
+  }
+  return {
+    baseUrl: baseUrl.replace(/\/+$/, ''),
+    authHeader: 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64'),
+  };
+}
+
+async function confluenceFetch(
+  path: string,
+  init: RequestInit & { jsonBody?: unknown } = {},
+): Promise<Response> {
+  const { baseUrl, authHeader } = getConfluenceConfig();
+  const headers: Record<string, string> = {
+    Authorization: authHeader,
+    Accept: 'application/json',
+    ...((init.headers as Record<string, string>) ?? {}),
+  };
+  let body = init.body;
+  if (init.jsonBody !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(init.jsonBody);
+  }
+  return fetch(`${baseUrl}${path}`, { ...init, headers, body });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Create a page
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CreateConfluencePageParams {
+  title: string;
+  markdown: string;
+  spaceKey?: string;
+  parentPageId?: string;
+}
+
+export interface ConfluencePage {
+  pageId: string;
+  title: string;
+  pageUrl: string;
+  spaceKey: string;
+}
+
+/**
+ * Convert a markdown blog draft to Confluence-compatible HTML. Strips YAML
+ * frontmatter from the visible body, pins it as a metadata block at the top.
+ */
+async function markdownToConfluenceHtml(markdown: string): Promise<string> {
+  let body = markdown;
+  let metaBlock = '';
+
+  if (body.startsWith('---')) {
+    const parts = body.split('---');
+    if (parts.length >= 3) {
+      metaBlock = `<p><em>SEO metadata:</em></p><pre>${parts[1].trim()}</pre><hr/>`;
+      body = parts.slice(2).join('---').trim();
+    }
+  }
+
+  const bodyHtml = await marked.parse(body, { gfm: true });
+  return `${metaBlock}${bodyHtml}`;
+}
+
+/**
+ * Create a new Confluence page in the configured space. Returns page ID and
+ * full URL. The page is created as a child of CONFLUENCE_PARENT_PAGE_ID if set,
+ * otherwise at the space root.
+ */
+export async function createConfluencePage(
+  params: CreateConfluencePageParams,
+): Promise<ConfluencePage> {
+  const { baseUrl } = getConfluenceConfig();
+  const spaceKey = params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY;
+  if (!spaceKey) {
+    throw new Error(
+      'No space key. Set CONFLUENCE_SPACE_KEY or pass spaceKey to save_to_confluence.',
+    );
+  }
+  const parentId = params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID;
+
+  const html = await markdownToConfluenceHtml(params.markdown);
+
+  const requestBody: Record<string, unknown> = {
+    type: 'page',
+    title: params.title,
+    space: { key: spaceKey },
+    body: {
+      storage: {
+        value: html,
+        representation: 'storage',
+      },
+    },
+  };
+  if (parentId) {
+    requestBody.ancestors = [{ id: parentId }];
+  }
+
+  const resp = await confluenceFetch('/rest/api/content', {
+    method: 'POST',
+    jsonBody: requestBody,
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Confluence create failed: HTTP ${resp.status} — ${err.slice(0, 500)}`);
+  }
+  const page = (await resp.json()) as {
+    id: string;
+    title: string;
+    space?: { key: string };
+    _links?: { webui?: string };
+  };
+  const webui = page._links?.webui ?? `/spaces/${spaceKey}/pages/${page.id}`;
+  return {
+    pageId: page.id,
+    title: page.title,
+    pageUrl: `${baseUrl}${webui}`,
+    spaceKey: page.space?.key ?? spaceKey,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read a page
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PAGE_URL_RE = /\/pages\/(\d+)/;
+const RAW_ID_RE = /^\d+$/;
+
+export function extractConfluencePageId(input: string): string {
+  const m = input.match(PAGE_URL_RE);
+  if (m) return m[1];
+  if (RAW_ID_RE.test(input.trim())) return input.trim();
+  throw new Error(
+    `Could not extract a Confluence page ID from "${input.slice(0, 80)}". Paste the full page URL.`,
+  );
+}
+
+export interface FetchedConfluencePage {
+  pageId: string;
+  title: string;
+  markdown: string;
+  sourceUrl: string;
+  spaceKey: string;
+  version: number;
+  charCount: number;
+}
+
+/**
+ * Read a Confluence page and return its contents as markdown.
+ * Fetches the page in 'storage' format (Confluence's HTML-ish format),
+ * then converts to markdown with turndown.
+ */
+export async function readConfluencePage(idOrUrl: string): Promise<FetchedConfluencePage> {
+  const pageId = extractConfluencePageId(idOrUrl);
+  const { baseUrl } = getConfluenceConfig();
+
+  const resp = await confluenceFetch(
+    `/rest/api/content/${pageId}?expand=body.storage,space,version`,
+  );
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Confluence read failed: HTTP ${resp.status} — ${err.slice(0, 500)}`);
+  }
+  const page = (await resp.json()) as {
+    id: string;
+    title: string;
+    space?: { key: string };
+    version?: { number: number };
+    body?: { storage?: { value: string } };
+    _links?: { webui?: string };
+  };
+
+  const html = page.body?.storage?.value ?? '';
+  const turndown = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-',
+  });
+  const markdown = turndown.turndown(html).trim();
+
+  const webui = page._links?.webui ?? `/spaces/${page.space?.key ?? ''}/pages/${page.id}`;
+  return {
+    pageId: page.id,
+    title: page.title,
+    markdown,
+    sourceUrl: `${baseUrl}${webui}`,
+    spaceKey: page.space?.key ?? '',
+    version: page.version?.number ?? 1,
+    charCount: markdown.length,
+  };
+}
