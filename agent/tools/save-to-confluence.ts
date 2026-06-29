@@ -32,7 +32,7 @@ export const saveToConfluenceTool = createTool({
     try {
       const result = await createConfluencePage({ title, markdown, spaceKey, parentPageId });
       console.log(
-        `[save_to_confluence] done in ${Date.now() - t0}ms (pageId=${result.pageId})`,
+        `[save_to_confluence] done in ${Date.now() - t0}ms (pageId=${result.pageId}, identity=${result.identity})`,
       );
       return {
         success: true,
@@ -40,6 +40,7 @@ export const saveToConfluenceTool = createTool({
         title: result.title,
         pageUrl: result.pageUrl,
         spaceKey: result.spaceKey,
+        identity: result.identity,
       };
     } catch (e) {
       console.log(

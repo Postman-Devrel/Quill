@@ -1,23 +1,76 @@
 import { marked } from 'marked';
 import TurndownService from 'turndown';
+import { getCurrentUser } from './user-context.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quill's Confluence defaults — edit these to match your org.
+//
+// Per-user credentials (so pages are owned by the actual requester):
+//   Set CONFLUENCE_EMAIL_<SLACK_USER_ID> and CONFLUENCE_TOKEN_<SLACK_USER_ID>
+//   in the Astro account vault, e.g.:
+//     ast secrets create CONFLUENCE_EMAIL_U07ABC123  (= alice@postman.com)
+//     ast secrets create CONFLUENCE_TOKEN_U07ABC123  (= alice's API token)
+//   Slack user IDs are visible in each user's Slack profile → "..." → Copy
+//   member ID. They look like "U07A1B2C3".
+//
+// If no per-user creds exist for the current user, falls back to the default
+// CONFLUENCE_API_TOKEN + email below.
+// ─────────────────────────────────────────────────────────────────────────────
+const DEFAULT_BASE_URL = 'https://postman.atlassian.net/wiki';
+const DEFAULT_EMAIL = 'pooja.mistry@postman.com';
+const DEFAULT_SPACE_KEY = 'DEVREL'; // ← change this to your team's Confluence space key
+const DEFAULT_PARENT_PAGE_ID: string | undefined = undefined;
 
 interface ConfluenceConfig {
   baseUrl: string;
   authHeader: string;
+  /** Which identity is making the call — for logging. */
+  identity: string;
+}
+
+function envVarSafe(id: string): string {
+  return id.replace(/[^A-Z0-9_]/gi, '_');
 }
 
 function getConfluenceConfig(): ConfluenceConfig {
-  const baseUrl = process.env.CONFLUENCE_BASE_URL;
-  const email = process.env.CONFLUENCE_EMAIL;
-  const token = process.env.CONFLUENCE_API_TOKEN;
-  if (!baseUrl || !email || !token) {
+  const baseUrl = (process.env.CONFLUENCE_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
+  const { userId } = getCurrentUser();
+
+  let email: string | undefined;
+  let token: string | undefined;
+  let identity = 'default';
+
+  // 1. Try per-user credentials first
+  if (userId) {
+    const slug = envVarSafe(userId);
+    const userEmail = process.env[`CONFLUENCE_EMAIL_${slug}`];
+    const userToken = process.env[`CONFLUENCE_TOKEN_${slug}`];
+    if (userEmail && userToken) {
+      email = userEmail;
+      token = userToken;
+      identity = `${userId}/${userEmail}`;
+    }
+  }
+
+  // 2. Fall back to default creds
+  if (!token) {
+    email = process.env.CONFLUENCE_EMAIL ?? DEFAULT_EMAIL;
+    token = process.env.CONFLUENCE_API_TOKEN;
+    if (token) identity = `default/${email}`;
+  }
+
+  if (!token) {
     throw new Error(
-      'Confluence not configured. Set CONFLUENCE_BASE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN via: ast project configure',
+      userId
+        ? `No Confluence token for user ${userId}, and CONFLUENCE_API_TOKEN fallback is unset. Either add CONFLUENCE_TOKEN_${envVarSafe(userId)} + CONFLUENCE_EMAIL_${envVarSafe(userId)} to the vault, or set the default CONFLUENCE_API_TOKEN.`
+        : 'CONFLUENCE_API_TOKEN is not set. Run: ast project configure (locally) or `ast secrets create CONFLUENCE_API_TOKEN` (for deploy).',
     );
   }
+
   return {
-    baseUrl: baseUrl.replace(/\/+$/, ''),
+    baseUrl,
     authHeader: 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64'),
+    identity,
   };
 }
 
@@ -84,15 +137,13 @@ async function markdownToConfluenceHtml(markdown: string): Promise<string> {
  */
 export async function createConfluencePage(
   params: CreateConfluencePageParams,
-): Promise<ConfluencePage> {
-  const { baseUrl } = getConfluenceConfig();
-  const spaceKey = params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY;
-  if (!spaceKey) {
-    throw new Error(
-      'No space key. Set CONFLUENCE_SPACE_KEY or pass spaceKey to save_to_confluence.',
-    );
-  }
-  const parentId = params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID;
+): Promise<ConfluencePage & { identity: string }> {
+  const { baseUrl, identity } = getConfluenceConfig();
+  console.log(`[confluence] create as ${identity}`);
+  const spaceKey =
+    params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY ?? DEFAULT_SPACE_KEY;
+  const parentId =
+    params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID ?? DEFAULT_PARENT_PAGE_ID;
 
   const html = await markdownToConfluenceHtml(params.markdown);
 
@@ -131,6 +182,7 @@ export async function createConfluencePage(
     title: page.title,
     pageUrl: `${baseUrl}${webui}`,
     spaceKey: page.space?.key ?? spaceKey,
+    identity,
   };
 }
 
@@ -167,7 +219,8 @@ export interface FetchedConfluencePage {
  */
 export async function readConfluencePage(idOrUrl: string): Promise<FetchedConfluencePage> {
   const pageId = extractConfluencePageId(idOrUrl);
-  const { baseUrl } = getConfluenceConfig();
+  const { baseUrl, identity } = getConfluenceConfig();
+  console.log(`[confluence] read as ${identity}`);
 
   const resp = await confluenceFetch(
     `/rest/api/content/${pageId}?expand=body.storage,space,version`,
