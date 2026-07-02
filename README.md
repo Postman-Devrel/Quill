@@ -59,7 +59,7 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 - 🔎 **Coverage check before drafting** — searches blog.postman.com first to avoid duplicating content
 - ✍️ **Postman-voice drafting** — 1200–1600 word technical drafts with YAML SEO frontmatter
 - ✂️ **Copy-editing** — grammar, repetitive structure, Postman style guide compliance, branded-term capitalization, SEO scoring
-- 📁 **Confluence sync** — every draft + every edit gets a new Confluence page, owned by the actual requester (per-user credentials)
+- 📁 **Confluence sync** — every draft + every edit gets a new Confluence page in a shared "Quill Drafts" space, owned by a bot service account
 - 📤 **WordPress staging** — frontmatter-driven WP draft create-or-update, auto-resolves tags, sets Yoast SEO metadata. **Always status=draft — Quill never publishes.**
 - 📅 **Editorial slot suggestions** — surfaces the next open Tue/Thu 8am PT slots per the editorial rules (Fri/Sat/Sun and US holidays excluded, no same-day conflicts). Informational only — a human editor still schedules in WP admin.
 - 📊 **Blog ideas** — parallel research + 0–100 scored ideas across 5 weighted criteria
@@ -147,7 +147,6 @@ Slack ──► Astropods messaging sidecar ──► UserContextAdapter (captur
 ```
 
 - **Top-level Mastra agent** handles routing, conversation memory, Slack streaming.
-- **`UserContextAdapter`** wraps `MastraAdapter` and stashes the Slack user ID in `AsyncLocalStorage` for the duration of each request. Tools read this when they need to resolve per-user credentials.
 - **Tools that need cognition** (`write_draft`, `copyedit_draft`, `blog_ideas`) make their own Anthropic SDK calls with full SKILL-derived system prompts. This preserves prompt isolation between drafting / editing / scoring.
 - **Pure API tools** wrap WordPress REST, Confluence REST, Tavily, and an in-process scheduling library (US holidays + Tue/Thu rules in `lib/scheduling.ts`).
 
@@ -155,19 +154,15 @@ State is intentionally minimal in v1 — Mastra's in-memory store carries the ac
 
 ---
 
-## Per-user Confluence identity
+## Service-account pattern
 
-Pages owned by a single bot account get lost in Confluence over time. Quill resolves the actual Slack user per request and uses their personal API token, so blog drafts are owned by the team member who asked for them.
+Quill uses **one shared Confluence identity** — a dedicated service-account user (e.g. `quill@postman.com`, NOT a personal email) with an API token that has write access to one shared "Quill Drafts" space. Every team member using Quill gets their drafts saved to the same place, owned by the bot. Deploy once, one auth for the whole company.
 
-```bash
-# For each team member (Slack member ID is in their Slack profile → ⋯ → Copy member ID):
-ast secrets create CONFLUENCE_EMAIL_U07A1B2C3   # alice@postman.com
-ast secrets create CONFLUENCE_TOKEN_U07A1B2C3   # her personal API token
-```
-
-If no per-user mapping exists for a Slack user, Quill falls back to the default `CONFLUENCE_API_TOKEN` so it still works — pages just end up owned by the default identity.
-
-The `[confluence] create as U07A1B2C3/alice@postman.com` log line tells you which identity was used for each call.
+Setup requires (one time, by an admin):
+1. Create the service-account user in Atlassian
+2. Create the shared "Quill Drafts" Confluence space
+3. Grant the service account "Add pages" permission on that space
+4. Generate an API token while signed in AS the service account
 
 ---
 
@@ -180,13 +175,11 @@ Astropods auto-injects `ANTHROPIC_API_KEY` because `astropods.yml` declares `mod
 | `TAVILY_API_KEY` | ✅ | Web search for research + blog ideas |
 | `WP_USERNAME` | ✅ | blog.postman.com WordPress username |
 | `WP_APP_PASSWORD` | ✅ | WP Application Password (not your login password) |
-| `CONFLUENCE_API_TOKEN` | ✅ | Default Confluence token (used when no per-user creds match) |
-| `CONFLUENCE_EMAIL_<userId>` | optional | Per-user Confluence email (e.g. `CONFLUENCE_EMAIL_U07ABC123`) |
-| `CONFLUENCE_TOKEN_<userId>` | optional | Per-user Confluence API token |
-| `CONFLUENCE_BASE_URL` | optional | Override default (`https://postman.atlassian.net/wiki`) |
-| `CONFLUENCE_EMAIL` | optional | Override default email for the fallback token |
-| `CONFLUENCE_SPACE_KEY` | optional | Override default space (`DEVREL`) |
-| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a parent page |
+| `CONFLUENCE_EMAIL` | ✅ | Service-account email (e.g. `quill@postman.com`) — NOT a personal address |
+| `CONFLUENCE_API_TOKEN` | ✅ | API token for the service account |
+| `CONFLUENCE_SPACE_KEY` | ✅ | Shared destination space key (e.g. `QUILL` or `BLOG-DRAFTS`) |
+| `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
+| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page |
 
 Defaults for base URL, email, space key, and parent page live in [`agent/lib/confluence.ts`](agent/lib/confluence.ts) — edit them once for your org instead of setting env vars.
 
@@ -223,14 +216,15 @@ ast secrets create TAVILY_API_KEY
 ast secrets create WP_USERNAME
 ast secrets create WP_APP_PASSWORD
 ast secrets create CONFLUENCE_API_TOKEN
-# Plus per-user CONFLUENCE_EMAIL_/TOKEN_ entries as people onboard
 
-# 3. Deploy
+# 3. Deploy — secrets via @ shorthand, non-secret vars passed literally
 ast deploy @postman/quill \
   --var TAVILY_API_KEY=@ \
   --var WP_USERNAME=@ \
   --var WP_APP_PASSWORD=@ \
   --var CONFLUENCE_API_TOKEN=@ \
+  --var CONFLUENCE_EMAIL=quill@postman.com \
+  --var CONFLUENCE_SPACE_KEY=QUILL \
   --adapter web \
   --adapter slack \
   --name "Quill" \
@@ -281,10 +275,9 @@ Quill/
     ├── tools/                 # 12 tool definitions
     └── lib/
         ├── anthropic.ts       # @anthropic-ai/sdk wrapper for tool-internal calls
-        ├── confluence.ts      # Confluence REST + per-user identity lookup
+        ├── confluence.ts      # Confluence REST client (service-account identity)
         ├── markdown.ts        # frontmatter parser + marked wrapper
         ├── scheduling.ts      # pure scheduling logic (Tue/Thu, US holidays)
-        ├── user-context.ts    # AsyncLocalStorage for per-user identity
         └── wordpress.ts       # WP REST client
 ```
 

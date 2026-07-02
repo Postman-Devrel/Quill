@@ -70,11 +70,10 @@ Plus utilities: `list_wp_schedule` (editorial calendar views) and `wp_publish_st
 
 - Top-level Mastra agent (`agent/index.ts`) handles routing, conversation memory, and Slack streaming via `MastraAdapter` + `serve()` from `@astropods/adapter-core`.
 - Tools that need their own cognition (`write_draft`, `copyedit_draft`, `blog_ideas`) make dedicated `@anthropic-ai/sdk` calls via `agent/lib/anthropic.ts` with their full SKILL-derived system prompts — preserving prompt isolation between drafting, editing, and idea-scoring cognition.
-- A `UserContextAdapter` wrapper captures the Slack user ID into `AsyncLocalStorage` per request, so per-user Confluence credentials can resolve correctly.
 - Pure API wrappers for WordPress REST, Confluence REST, Tavily, and the in-process scheduling logic (`lib/scheduling.ts` — US holidays + Tue/Thu rules, no API calls).
 
 ```
-Slack → Astropods messaging sidecar → UserContextAdapter → MastraAdapter
+Slack → Astropods messaging sidecar → MastraAdapter
         → Quill agent (top-level Claude routing)
             ├── pure API tools (WP, Confluence, Tavily)
             └── per-tool Claude calls (write_draft, copyedit_draft, blog_ideas)
@@ -94,23 +93,21 @@ Astropods injects `ANTHROPIC_API_KEY` automatically via `models.anthropic.provid
 | `TAVILY_API_KEY` | ✅ | Web search for research + blog ideas |
 | `WP_USERNAME` | ✅ | blog.postman.com WordPress login |
 | `WP_APP_PASSWORD` | ✅ | WP Application Password (NOT your login password — generate at `blog.postman.com/wp-admin/profile.php` → Application Passwords) |
-| `CONFLUENCE_API_TOKEN` | ✅ | Default Confluence token (used when no per-user credentials match) |
-| `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postman.atlassian.net/wiki` (set in `lib/confluence.ts`) |
-| `CONFLUENCE_EMAIL` | optional | Default email for the default token (set in `lib/confluence.ts`) |
-| `CONFLUENCE_SPACE_KEY` | optional | Default space for new pages (set in `lib/confluence.ts`) |
-| `CONFLUENCE_PARENT_PAGE_ID` | optional | Optional parent page to nest drafts under |
+| `CONFLUENCE_EMAIL` | ✅ | Service-account email (e.g. `quill@postman.com`) — NOT a personal address |
+| `CONFLUENCE_API_TOKEN` | ✅ | API token for the service account |
+| `CONFLUENCE_SPACE_KEY` | ✅ | Shared destination space key (e.g. `QUILL` or `BLOG-DRAFTS`) |
+| `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
+| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page in the space |
 
-### Per-user Confluence credentials (so pages are owned by the actual requester)
+### Service-account pattern
 
-Pages created via the default token are all owned by one Atlassian user. To attribute pages to whoever is talking to Quill in Slack, register per-user credentials:
+Quill uses **one shared identity** for Confluence — a dedicated service-account user (e.g. `quill@postman.com`, NOT a personal email) with an API token that has write access to one shared "Quill Drafts" space. Every team member using Quill gets their drafts saved to the same place, owned by the bot. Deploy once, one auth for the whole company.
 
-```bash
-# For each team member (Slack member ID looks like U07A1B2C3):
-ast secrets create CONFLUENCE_EMAIL_U07A1B2C3     # = alice@postman.com
-ast secrets create CONFLUENCE_TOKEN_U07A1B2C3     # = her API token
-```
-
-Quill detects the Slack user per message and uses the matching credentials. If a user has no entry, it falls back to the default token + email — Quill still works for them, but the page is owned by the default identity.
+Setup requires (one time, by an admin):
+1. Create the service-account user in Atlassian
+2. Create the shared "Quill Drafts" Confluence space
+3. Grant the service account "Add pages" permission on that space
+4. Generate an API token while signed in AS the service account
 
 ---
 
@@ -143,14 +140,15 @@ ast secrets create TAVILY_API_KEY
 ast secrets create WP_USERNAME
 ast secrets create WP_APP_PASSWORD
 ast secrets create CONFLUENCE_API_TOKEN
-# (plus per-user CONFLUENCE_EMAIL_/TOKEN_ entries as needed)
 
-# 3. Deploy
+# 3. Deploy — secrets referenced with `@`, non-secret vars passed literally
 ast deploy @postman/quill \
   --var TAVILY_API_KEY=@ \
   --var WP_USERNAME=@ \
   --var WP_APP_PASSWORD=@ \
   --var CONFLUENCE_API_TOKEN=@ \
+  --var CONFLUENCE_EMAIL=quill@postman.com \
+  --var CONFLUENCE_SPACE_KEY=QUILL \
   --adapter web \
   --adapter slack \
   --name "Quill" \
@@ -174,7 +172,7 @@ Quill/
 ├── tsconfig.json
 ├── PLAN.md                    # build history / decisions
 └── agent/
-    ├── index.ts               # Mastra agent + UserContextAdapter + serve()
+    ├── index.ts               # Mastra agent + serve()
     ├── instructions.ts        # top-level system prompt (the orchestrator)
     ├── prompts/               # blog-write, copyedit, blog-ideas system prompts
     ├── tools/                 # 12 tool definitions
@@ -183,7 +181,6 @@ Quill/
         ├── confluence.ts      # Confluence REST + per-user identity lookup
         ├── markdown.ts        # frontmatter parser + marked wrapper
         ├── scheduling.ts      # pure scheduling logic (Tue/Thu, US holidays)
-        ├── user-context.ts    # AsyncLocalStorage for per-user identity
         └── wordpress.ts       # WP REST client
 ```
 

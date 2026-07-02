@@ -1,25 +1,25 @@
 import { marked } from 'marked';
 import TurndownService from 'turndown';
-import { getCurrentUser } from './user-context.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quill's Confluence defaults — edit these to match your org.
+// Quill's Confluence config
 //
-// Per-user credentials (so pages are owned by the actual requester):
-//   Set CONFLUENCE_EMAIL_<SLACK_USER_ID> and CONFLUENCE_TOKEN_<SLACK_USER_ID>
-//   in the Astro account vault, e.g.:
-//     ast secrets create CONFLUENCE_EMAIL_U07ABC123  (= alice@postman.com)
-//     ast secrets create CONFLUENCE_TOKEN_U07ABC123  (= alice's API token)
-//   Slack user IDs are visible in each user's Slack profile → "..." → Copy
-//   member ID. They look like "U07A1B2C3".
+// One shared service-account identity (e.g. quill-bot@postman.com) writes to
+// one shared space. All blog drafts end up in the same place regardless of
+// which team member asked Quill to save. Everyone using Quill is authorized
+// via ONE token, no per-user setup.
 //
-// If no per-user creds exist for the current user, falls back to the default
-// CONFLUENCE_API_TOKEN + email below.
+// Required env vars:
+//   CONFLUENCE_EMAIL       — bot email (e.g. quill@postman.com)
+//   CONFLUENCE_API_TOKEN   — the bot's Atlassian API token
+//   CONFLUENCE_SPACE_KEY   — the shared 'Quill Drafts' space key
+//
+// Optional env vars:
+//   CONFLUENCE_BASE_URL    — defaults below; only override if your instance
+//                            isn't on postmanlabs.atlassian.net
+//   CONFLUENCE_PARENT_PAGE_ID — nest drafts under a parent page in the space
 // ─────────────────────────────────────────────────────────────────────────────
-const DEFAULT_BASE_URL = 'https://postman.atlassian.net/wiki';
-const DEFAULT_EMAIL = 'pooja.mistry@postman.com';
-const DEFAULT_SPACE_KEY = 'DEVREL'; // ← change this to your team's Confluence space key
-const DEFAULT_PARENT_PAGE_ID: string | undefined = undefined;
+const DEFAULT_BASE_URL = 'https://postmanlabs.atlassian.net/wiki';
 
 interface ConfluenceConfig {
   baseUrl: string;
@@ -28,49 +28,21 @@ interface ConfluenceConfig {
   identity: string;
 }
 
-function envVarSafe(id: string): string {
-  return id.replace(/[^A-Z0-9_]/gi, '_');
-}
-
 function getConfluenceConfig(): ConfluenceConfig {
   const baseUrl = (process.env.CONFLUENCE_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
-  const { userId } = getCurrentUser();
+  const email = process.env.CONFLUENCE_EMAIL;
+  const token = process.env.CONFLUENCE_API_TOKEN;
 
-  let email: string | undefined;
-  let token: string | undefined;
-  let identity = 'default';
-
-  // 1. Try per-user credentials first
-  if (userId) {
-    const slug = envVarSafe(userId);
-    const userEmail = process.env[`CONFLUENCE_EMAIL_${slug}`];
-    const userToken = process.env[`CONFLUENCE_TOKEN_${slug}`];
-    if (userEmail && userToken) {
-      email = userEmail;
-      token = userToken;
-      identity = `${userId}/${userEmail}`;
-    }
-  }
-
-  // 2. Fall back to default creds
-  if (!token) {
-    email = process.env.CONFLUENCE_EMAIL ?? DEFAULT_EMAIL;
-    token = process.env.CONFLUENCE_API_TOKEN;
-    if (token) identity = `default/${email}`;
-  }
-
-  if (!token) {
+  if (!email || !token) {
     throw new Error(
-      userId
-        ? `No Confluence token for user ${userId}, and CONFLUENCE_API_TOKEN fallback is unset. Either add CONFLUENCE_TOKEN_${envVarSafe(userId)} + CONFLUENCE_EMAIL_${envVarSafe(userId)} to the vault, or set the default CONFLUENCE_API_TOKEN.`
-        : 'CONFLUENCE_API_TOKEN is not set. Run: ast project configure (locally) or `ast secrets create CONFLUENCE_API_TOKEN` (for deploy).',
+      'Confluence not configured. Set CONFLUENCE_EMAIL and CONFLUENCE_API_TOKEN via `ast project configure` (locally) or `ast secrets create` (for deploy).',
     );
   }
 
   return {
     baseUrl,
     authHeader: 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64'),
-    identity,
+    identity: email,
   };
 }
 
@@ -140,10 +112,13 @@ export async function createConfluencePage(
 ): Promise<ConfluencePage & { identity: string }> {
   const { baseUrl, identity } = getConfluenceConfig();
   console.log(`[confluence] create as ${identity}`);
-  const spaceKey =
-    params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY ?? DEFAULT_SPACE_KEY;
-  const parentId =
-    params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID ?? DEFAULT_PARENT_PAGE_ID;
+  const spaceKey = params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY;
+  if (!spaceKey) {
+    throw new Error(
+      'CONFLUENCE_SPACE_KEY is not set. This is the key of the shared "Quill Drafts" Confluence space where all blog drafts get saved. Set it via `ast project configure` (locally) or `ast secrets create CONFLUENCE_SPACE_KEY` (for deploy).',
+    );
+  }
+  const parentId = params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID;
 
   const html = await markdownToConfluenceHtml(params.markdown);
 

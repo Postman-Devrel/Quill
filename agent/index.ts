@@ -5,15 +5,9 @@ import { LibSQLStore } from '@mastra/libsql';
 import { Observability } from '@mastra/observability';
 import { OtelExporter } from '@mastra/otel-exporter';
 import { MastraAdapter } from '@astropods/adapter-mastra';
-import {
-  serve,
-  type AgentAdapter,
-  type StreamHooks,
-  type StreamOptions,
-} from '@astropods/adapter-core';
+import { serve } from '@astropods/adapter-core';
 
 import { QUILL_INSTRUCTIONS } from './instructions.js';
-import { userContextStorage } from './lib/user-context.js';
 import {
   webSearchTool,
   writeDraftTool,
@@ -90,30 +84,4 @@ const agent = new Agent({
 
 new Mastra({ agents: { quill: agent }, observability });
 
-/**
- * Wrap MastraAdapter to capture the current Slack user (options.userId) into
- * AsyncLocalStorage for the duration of each stream() call. Tools read this
- * via getCurrentUser() so per-user credentials (e.g. Confluence tokens) work.
- */
-class UserContextAdapter implements AgentAdapter {
-  readonly name: string;
-  streamAudio?: AgentAdapter['streamAudio'];
-
-  constructor(private readonly inner: AgentAdapter) {
-    this.name = inner.name;
-    if (inner.streamAudio) this.streamAudio = inner.streamAudio.bind(inner);
-  }
-
-  async stream(prompt: string, hooks: StreamHooks, options: StreamOptions) {
-    return userContextStorage.run(
-      { userId: options.userId, conversationId: options.conversationId },
-      () => this.inner.stream(prompt, hooks, options),
-    );
-  }
-
-  getConfig() {
-    return this.inner.getConfig();
-  }
-}
-
-serve(new UserContextAdapter(new MastraAdapter(agent)));
+serve(new MastraAdapter(agent));

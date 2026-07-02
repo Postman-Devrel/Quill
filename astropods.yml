@@ -19,10 +19,22 @@ agent:
       datatype: string
       secret: true
       description: WordPress application password (generate at blog.postman.com/wp-admin/profile.php under Application Passwords)
+    - name: CONFLUENCE_EMAIL
+      datatype: string
+      secret: false
+      description: Email of the Quill service-account user (e.g. quill@postman.com). Pages will be owned by this identity in Confluence — do not use a personal email.
     - name: CONFLUENCE_API_TOKEN
       datatype: string
       secret: true
-      description: Confluence API token (generate at id.atlassian.com → Security → Create and manage API tokens). Other Confluence config (base URL, email, space, parent page) is set as defaults in agent/lib/confluence.ts.
+      description: API token for the service account. Generate at id.atlassian.com while signed in AS the service account (not your personal account).
+    - name: CONFLUENCE_SPACE_KEY
+      datatype: string
+      secret: false
+      description: Key of the shared Confluence space where Quill saves ALL blog drafts (e.g. QUILL, BLOG-DRAFTS). Find it in any page URL under /wiki/spaces/{KEY}/pages/...
+    - name: CONFLUENCE_PARENT_PAGE_ID
+      datatype: string
+      secret: false
+      description: Optional. Numeric ID of a parent page under which to nest all drafts. Leave blank to save at the space root.
 
 models:
   anthropic:
