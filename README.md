@@ -2,7 +2,7 @@
 
 > *From idea to live post, without leaving Slack.*
 
-Quill is a Slack-first blog pipeline agent for Postman's DevRel team. Drop a topic in Slack and Quill researches it, drafts in Postman's developer-advocate voice, copy-edits for grammar / SEO / brand voice, saves every version to Confluence, stages it to [blog.postman.com](https://blog.postman.com) as a WordPress draft, and schedules it for the next open Tue/Thu publish slot at 8am PT — all in one conversation.
+Quill is a Slack-first blog pipeline agent for Postman's DevRel team. Drop a topic in Slack and Quill researches it, drafts in Postman's developer-advocate voice, copy-edits for grammar / SEO / brand voice, saves every version to Confluence, and stages it to [blog.postman.com](https://blog.postman.com) as a WordPress draft — all in one conversation. **Scheduling and publishing stay with a human editor** in the WP admin panel; Quill can surface the next open Tue/Thu 8am PT publish slots as guidance but never acts on them.
 
 Built on [Mastra](https://mastra.ai) and deployed to the [Astropods](https://astropods.com) platform.
 
@@ -46,7 +46,10 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 
        ✂️ Copy-edit done · Quality score: 9/10
        📤 Staged as draft #12345 on blog.postman.com
-       📅 Want to schedule it? Say "schedule this for next available"
+
+       The draft is staged. A human editor needs to schedule it in the WP
+       admin panel — Quill is staging-only. Want to know the next open
+       publish slots? Say "when could this go live?"
 ```
 
 ---
@@ -57,8 +60,8 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 - ✍️ **Postman-voice drafting** — 1200–1600 word technical drafts with YAML SEO frontmatter
 - ✂️ **Copy-editing** — grammar, repetitive structure, Postman style guide compliance, branded-term capitalization, SEO scoring
 - 📁 **Confluence sync** — every draft + every edit gets a new Confluence page, owned by the actual requester (per-user credentials)
-- 📤 **WordPress staging** — frontmatter-driven WP draft create-or-update, auto-resolves tags, sets Yoast SEO metadata
-- 📅 **Editorial scheduling** — Tue/Thu 8am PT priority, never Fri/Sat/Sun, US holiday exclusions, conflict detection
+- 📤 **WordPress staging** — frontmatter-driven WP draft create-or-update, auto-resolves tags, sets Yoast SEO metadata. **Always status=draft — Quill never publishes.**
+- 📅 **Editorial slot suggestions** — surfaces the next open Tue/Thu 8am PT slots per the editorial rules (Fri/Sat/Sun and US holidays excluded, no same-day conflicts). Informational only — a human editor still schedules in WP admin.
 - 📊 **Blog ideas** — parallel research + 0–100 scored ideas across 5 weighted criteria
 - 📈 **Publishing stats** — counts published posts across any date range with monthly breakdown
 - 🔄 **Read existing Confluence pages** — paste a page URL and Quill imports it as markdown to copy-edit, rewrite as a blog, or brainstorm ideas from
@@ -74,7 +77,7 @@ Once deployed and `@quill` is in your channel:
 @quill write me a blog about API rate limiting strategies
 @quill copy-edit this
 @quill stage this to WordPress
-@quill schedule this for next available
+@quill when could this go live?
 @quill how many posts did we publish in Q1 2026?
 @quill show me what's on the editorial calendar
 @quill https://postman.atlassian.net/wiki/spaces/.../pages/123/My-Notes — turn this into a blog post
@@ -88,8 +91,8 @@ Once deployed and `@quill` is in your channel:
 |---|---|---|
 | 1 | "write me a blog about X" | Coverage check → optional research → draft → Confluence save → reply with markdown + link |
 | 2 | "copy-edit this" | Copyedit → save edited version to Confluence → quality report + edited markdown |
-| 3 | "stage this to WordPress" | Parse frontmatter → resolve tags → create or update WP draft (with Yoast metadata) |
-| 4 | "schedule this" / "publish next Tuesday" | Validate target date against editorial rules → flip draft → future → confirmation |
+| 3 | "stage this to WordPress" | Parse frontmatter → resolve tags → create or update WP draft (always status=draft) |
+| 4 | "when could this go live?" | Show next Tue/Thu open publish slots (informational — human schedules in WP admin) |
 | 5 | "what should I write about?" | 8–12 parallel web searches → scored ideas grouped by urgency tier → Confluence save |
 | 6 | Paste a Confluence URL | Read page as markdown → route to copyedit / write / blog_ideas / stage |
 
@@ -99,7 +102,7 @@ Plus quick lookups: `list_wp_schedule` (editorial calendar), `wp_publish_stats` 
 
 ## Tool catalog
 
-12 tools — two make dedicated Claude calls with their own system prompts; the rest are pure API wrappers.
+11 tools — three make dedicated Claude calls with their own system prompts; the rest are pure API wrappers. **All WordPress interaction is read-or-stage-only.** No tool can schedule or publish.
 
 | Tool | Calls Claude? | Purpose |
 |---|:---:|---|
@@ -110,10 +113,9 @@ Plus quick lookups: `list_wp_schedule` (editorial calendar), `wp_publish_stats` 
 | `blog_ideas` | ✅ | Score 8–12 ideas across 5 weighted criteria from research input |
 | `save_to_confluence` | — | Create a new Confluence page from markdown |
 | `read_confluence` | — | Read a Confluence page back as markdown |
-| `stage_to_wordpress` | — | Create or update a WordPress draft (frontmatter-driven) |
-| `find_next_wp_slot` | — | Find the next open Tue/Thu publish slot per editorial rules |
-| `reschedule_wp_post` | — | Flip a draft → future with date validation |
-| `list_wp_schedule` | — | Editorial calendar (upcoming / monthly / summary views) |
+| `stage_to_wordpress` | — | Create or update a WordPress draft (always status=draft) |
+| `find_next_wp_slot` | — | Informational — returns next open Tue/Thu publish slots for a human to act on |
+| `list_wp_schedule` | — | Editorial calendar view (upcoming / monthly / summary) |
 | `wp_publish_stats` | — | Date-range publish counts with monthly breakdown |
 
 ---

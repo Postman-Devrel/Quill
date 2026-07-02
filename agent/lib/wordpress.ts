@@ -280,40 +280,9 @@ export async function getScheduledPosts(): Promise<ScheduledPost[]> {
   return all;
 }
 
-/**
- * Set a post's date and flip it from draft → future (scheduled). The dateIsoLocal
- * argument should be like "2026-07-02T08:00:00" — interpreted in WP's configured
- * timezone (PST/PT for blog.postman.com).
- */
-export async function schedulePost(
-  postId: number,
-  dateIsoLocal: string,
-): Promise<CreatedOrUpdatedPost> {
-  const resp = await wpFetch(`/posts/${postId}`, {
-    method: 'PUT',
-    jsonBody: {
-      status: 'future',
-      date: dateIsoLocal,
-    },
-  });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Schedule failed: HTTP ${resp.status} — ${err}`);
-  }
-  const post = (await resp.json()) as {
-    id: number;
-    title: { rendered: string };
-    status: string;
-    link: string;
-  };
-  return {
-    id: post.id,
-    title: decodeHtmlEntities(post.title?.rendered ?? ''),
-    status: post.status,
-    link: post.link,
-    editLink: `https://blog.postman.com/wp-admin/post.php?post=${post.id}&action=edit`,
-  };
-}
+// NOTE: schedulePost() was intentionally removed — Quill is staging-only and
+// must not flip posts to status=future. Scheduling is a human editor action
+// done in the WP admin panel.
 
 export async function createOrUpdatePost(
   params: CreateOrUpdatePostParams,
