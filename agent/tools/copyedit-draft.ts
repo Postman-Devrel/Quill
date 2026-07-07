@@ -10,6 +10,7 @@ interface CopyeditResult {
   urlSlug: string;
   qualityScore: number;
   changes: string[];
+  flags: string[];
 }
 
 function validateCopyeditResult(raw: unknown): CopyeditResult {
@@ -29,13 +30,14 @@ function validateCopyeditResult(raw: unknown): CopyeditResult {
     urlSlug: typeof p.urlSlug === 'string' ? p.urlSlug : '',
     qualityScore: typeof p.qualityScore === 'number' ? p.qualityScore : 0,
     changes: p.changes.map((c) => String(c)),
+    flags: Array.isArray(p.flags) ? p.flags.map((f) => String(f)) : [],
   };
 }
 
 export const copyeditDraftTool = createTool({
   id: 'copyedit_draft',
   description:
-    'Copy edit a blog draft for grammar, repetitive structure, Postman style guide compliance (branded terms, prohibited words, inclusive language), and SEO. Returns the fully edited markdown plus the optimized SEO title, 150-char meta description, URL slug, a quality score 1-10, and a short list of changes made. Use this AFTER write_draft when the user asks to copy-edit, polish, or finalize a draft. Takes ~30 seconds.',
+    'Copy edit a blog draft for grammar, repetitive structure, Postman style guide compliance (branded terms, prohibited words, inclusive language), and SEO. Returns the fully edited markdown plus the optimized SEO title, 150-char meta description, URL slug, a quality score 1-10, a list of auto-applied changes, and a list of flags (risky rewrites the writer should review — sentence length, paragraph length, voice imbalance, weak titles). Surface flags to the user; they are suggestions, not applied edits. Use this AFTER write_draft when the user asks to copy-edit, polish, or finalize a draft. Takes ~30 seconds.',
   inputSchema: z.object({
     markdown: z
       .string()
@@ -55,7 +57,7 @@ export const copyeditDraftTool = createTool({
         maxTokens: 8000,
       });
       const result = validateCopyeditResult(parseJsonResponse(raw));
-      console.log(`[copyedit_draft] done in ${Date.now() - t0}ms (quality=${result.qualityScore}, ${result.changes.length} changes)`);
+      console.log(`[copyedit_draft] done in ${Date.now() - t0}ms (quality=${result.qualityScore}, ${result.changes.length} changes, ${result.flags.length} flags)`);
       return {
         success: true,
         ...result,

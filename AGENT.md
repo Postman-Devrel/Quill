@@ -1,7 +1,7 @@
 ---
 name: Quill
-description: Slack-first blog pipeline agent for Postman DevRel. Drop a topic and Quill researches, drafts, copy-edits, saves to Confluence, and stages to WordPress as a draft — a human editor still schedules and publishes.
-tags: [blog, content, devrel, writing, wordpress, confluence, publishing, slack]
+description: Slack-first blog pipeline agent for Postman DevRel. Drop a topic and Quill researches, drafts, copy-edits, saves to Confluence, files a Jira ticket for a header image, and stages to WordPress as a draft — a human editor schedules and publishes.
+tags: [blog, content, devrel, writing, wordpress, confluence, jira, publishing, slack]
 authors: [pmmistry]
 ---
 
@@ -9,156 +9,114 @@ authors: [pmmistry]
 
 > *From idea to live post, without leaving Slack.*
 
-Quill is the Postman DevRel team's content-pipeline agent for [blog.postman.com](https://blog.postman.com), accessible from Slack on the Astropods platform. It collapses what used to be a multi-tool workflow into a single conversation: research, content-gap check, full draft generation in Postman's voice, copy-editing for grammar / style guide / SEO, automatic Confluence saves for every draft and edit, and WordPress staging with auto-resolved tags and Yoast metadata. **Quill is staging-only** — it creates WordPress drafts but never publishes; a human editor schedules and publishes from the WP admin panel. Quill can surface the next open Tue/Thu 8am-PT publish slots (with US holiday exclusions and same-day conflict detection) as guidance.
-
-Quill also reads existing Confluence pages, so you can drop a page link and ask for a copy-edit, a fresh blog post built from it, or a brainstorm of related ideas.
-
----
-
-## Quick start
-
-```bash
-# In Slack (once deployed):
-@quill write me a blog about testing OAuth 2.0 in Postman
-@quill copy-edit this
-@quill stage this to WordPress
-@quill when could this go live?
-```
-
-Quill responds with the full markdown draft, a Confluence link, a WordPress preview link, and the next open publish slots — in that order, across the conversation. A human editor then schedules/publishes in WP admin.
+Quill is the Postman DevRel content-pipeline agent for [blog.postman.com](https://blog.postman.com), accessible from Slack on Astropods. One conversation replaces four tools: research → draft → copy-edit → save to Confluence → open a Jira header-image ticket → stage to WordPress as a draft. Quill never publishes — a human editor schedules and publishes from WP admin. Quill also reads existing Confluence pages, so you can drop a page link and ask for a copy-edit, a header-image ticket, or a fresh post built from it.
 
 ---
 
 ## What Quill does
 
-| Workflow | Trigger phrases | What happens |
-|---|---|---|
-| **Write blog** | "write me a blog about X", "quick draft on X" | Coverage check → optional research → write_draft → Confluence save → full markdown + Confluence link |
-| **Copy-edit** | "copy-edit this", "polish this draft" | copyedit_draft → save edited version to Confluence → quality score + changes + edited markdown |
-| **Stage to WordPress** | "stage this to WP", "push to WordPress" | Frontmatter-driven WP draft (auto-resolves tags, sets Yoast SEO meta, updates if title already exists). Always status=draft. |
-| **When could this go live?** | "when can it go live?", "show me open slots" | Informational — surfaces next Tue/Thu open slots per editorial rules. Quill CANNOT schedule; a human editor schedules in WP admin. |
-| **Blog ideas** | "what should I write about?", "blog ideas about MCP" | Parallel web_search → scored ideas grouped by urgency tier → saved as Confluence page |
-| **Read Confluence page** | Paste a Confluence URL | read_confluence → route to copy-edit / write / brainstorm / stage based on what you ask |
-
-Plus utilities: `list_wp_schedule` (editorial calendar views) and `wp_publish_stats` (counts by date range).
+| Trigger | Workflow |
+|---|---|
+| "write me a blog about X" | Coverage check → research → write → save to Confluence → return markdown + Confluence link |
+| "copy-edit this" | Style-guide + SEO pass → save edited version → return quality score, changes, and flagged risky rewrites |
+| "create a header ticket for this draft: `<confluence URL>`" | Read Confluence page → file Jira ticket in MKTG (`Header image request for blog: <title>`) with a link back to the draft |
+| "stage this to WordPress" | Frontmatter-driven WP draft — auto-tags, Yoast SEO, upserts if the title already exists. Always `status=draft` |
+| "when could this go live?" | Informational — surfaces the next open Tue/Thu 8am-PT slots. Cannot schedule |
+| "what should I write about?" | Parallel web search → 8–12 scored ideas by urgency tier → saved to Confluence |
+| Paste a Confluence URL | Routes to copy-edit / write / brainstorm / header-ticket based on what you ask |
 
 ---
 
 ## Tool catalog
 
-11 tools. Three make dedicated Claude calls with their own system prompts; the rest are pure API wrappers. **All WordPress interaction is read-or-stage-only** — no tool can schedule or publish posts.
+12 tools. Three make dedicated Claude calls with their own system prompts; the rest are pure API wrappers. **All WordPress interaction is stage-only.**
 
 | Tool | LLM | Purpose |
 |---|---|---|
 | `web_search` | ❌ | Tavily web search |
-| `check_blog_coverage` | ❌ | Search blog.postman.com to avoid duplicating content |
-| `write_draft` | ✅ | Generate 1200–1600 word blog draft with SEO frontmatter |
-| `copyedit_draft` | ✅ | Polish + Postman style guide + structured JSON output |
-| `blog_ideas` | ✅ | Score 8–12 ideas across 5 criteria from research input |
-| `save_to_confluence` | ❌ | Create a new Confluence page from markdown |
+| `check_blog_coverage` | ❌ | Search blog.postman.com to avoid duplicates |
+| `write_draft` | ✅ | 1200–1600 word draft with SEO frontmatter (Postman voice, banned-word enforcement) |
+| `copyedit_draft` | ✅ | Style-guide + SEO polish. Returns auto-applied `changes` + flagged risky rewrites (`flags`) |
+| `blog_ideas` | ✅ | Score 8–12 ideas across 5 weighted criteria |
+| `save_to_confluence` | ❌ | Create a Confluence page from markdown |
 | `read_confluence` | ❌ | Read a Confluence page back as markdown |
-| `stage_to_wordpress` | ❌ | Create or update a WordPress draft (always status=draft) |
-| `find_next_wp_slot` | ❌ | Informational — returns next open Tue/Thu publish slots for a human to act on |
-| `list_wp_schedule` | ❌ | Editorial calendar view (upcoming / monthly / summary) |
-| `wp_publish_stats` | ❌ | Date-range publish counts with monthly breakdown |
+| `create_header_request` | ❌ | File a Jira ticket in MKTG with a link to the Confluence draft |
+| `stage_to_wordpress` | ❌ | Create/update a WordPress draft (always `status=draft`) |
+| `find_next_wp_slot` | ❌ | Informational — next open Tue/Thu publish slots |
+| `list_wp_schedule` | ❌ | Editorial calendar views |
+| `wp_publish_stats` | ❌ | Publish counts by date range |
 
 ---
 
 ## Architecture
 
-**Hybrid Mastra + dedicated Claude calls per tool.**
-
-- Top-level Mastra agent (`agent/index.ts`) handles routing, conversation memory, and Slack streaming via `MastraAdapter` + `serve()` from `@astropods/adapter-core`.
-- Tools that need their own cognition (`write_draft`, `copyedit_draft`, `blog_ideas`) make dedicated `@anthropic-ai/sdk` calls via `agent/lib/anthropic.ts` with their full SKILL-derived system prompts — preserving prompt isolation between drafting, editing, and idea-scoring cognition.
-- Pure API wrappers for WordPress REST, Confluence REST, Tavily, and the in-process scheduling logic (`lib/scheduling.ts` — US holidays + Tue/Thu rules, no API calls).
+**Hybrid Mastra + per-tool Claude calls.** Top-level Mastra agent (`agent/index.ts`) routes conversation and streams to Slack via `MastraAdapter` + `serve()` from `@astropods/adapter-core`. Tools needing their own cognition (`write_draft`, `copyedit_draft`, `blog_ideas`) make direct `@anthropic-ai/sdk` calls with dedicated system prompts — keeping drafting, editing, and idea-scoring prompts isolated. The rest are pure API wrappers around WordPress, Confluence, Jira, Tavily, and in-process scheduling logic.
 
 ```
 Slack → Astropods messaging sidecar → MastraAdapter
         → Quill agent (top-level Claude routing)
-            ├── pure API tools (WP, Confluence, Tavily)
+            ├── pure API tools (WP, Confluence, Jira, Tavily)
             └── per-tool Claude calls (write_draft, copyedit_draft, blog_ideas)
-                  ↳ @anthropic-ai/sdk with tool-specific system prompts
 ```
 
-State is intentionally minimal in v1 — Mastra's in-memory store carries the active conversation; nothing persists across container restarts.
+State is intentionally minimal — Mastra's in-memory store carries the active conversation only.
 
 ---
 
 ## Configuration
 
-Astropods injects `ANTHROPIC_API_KEY` automatically via `models.anthropic.provider: anthropic` in `astropods.yml`. The other secrets you set explicitly:
+`ANTHROPIC_API_KEY` is auto-injected by Astropods. Set the rest via `ast project configure`:
 
-| Env var | Required? | Purpose |
+| Env var | Required | Purpose |
 |---|---|---|
-| `TAVILY_API_KEY` | ✅ | Web search for research + blog ideas |
-| `WP_USERNAME` | ✅ | blog.postman.com WordPress login |
-| `WP_APP_PASSWORD` | ✅ | WP Application Password (NOT your login password — generate at `blog.postman.com/wp-admin/profile.php` → Application Passwords) |
-| `CONFLUENCE_EMAIL` | ✅ | Service-account email (e.g. `quill@postman.com`) — NOT a personal address |
-| `CONFLUENCE_API_TOKEN` | ✅ | API token for the service account |
-| `CONFLUENCE_SPACE_KEY` | ✅ | Shared destination space key (e.g. `QUILL` or `BLOG-DRAFTS`) |
+| `TAVILY_API_KEY` | ✅ | Web search |
+| `WP_USERNAME` / `WP_APP_PASSWORD` | ✅ | blog.postman.com WordPress login (Application Password, not your login) |
+| `CONFLUENCE_EMAIL` / `CONFLUENCE_API_TOKEN` | ✅ | Atlassian service account (also authorizes Jira — one token, both products) |
+| `CONFLUENCE_SPACE_KEY` | ✅ | Destination space (e.g. `Quill`) |
 | `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
-| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page in the space |
+| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page |
+| `JIRA_PROJECT_KEY` | optional | Defaults to `MKTG` |
+| `JIRA_HEADER_ISSUE_TYPE` | optional | Defaults to `Task` |
+| `JIRA_MARKETING_TEAM` | optional | Required MKTG field. Defaults to `Creative` |
+| `JIRA_BASE_URL` | optional | Derived from `CONFLUENCE_BASE_URL` — override only if your Jira lives elsewhere |
 
 ### Service-account pattern
 
-Quill uses **one shared identity** for Confluence — a dedicated service-account user (e.g. `quill@postman.com`, NOT a personal email) with an API token that has write access to one shared "Quill Drafts" space. Every team member using Quill gets their drafts saved to the same place, owned by the bot. Deploy once, one auth for the whole company.
+Quill uses **one shared Atlassian identity** for both Confluence and Jira — a dedicated service-account user (e.g. `service.quill@postman.com`) with an API token that has (a) write access to the shared Confluence drafts space and (b) issue-create permission on the Jira `MKTG` project. Deploy once, one auth for the whole team, every draft and ticket owned by the bot.
 
-Setup requires (one time, by an admin):
-1. Create the service-account user in Atlassian
-2. Create the shared "Quill Drafts" Confluence space
-3. Grant the service account "Add pages" permission on that space
-4. Generate an API token while signed in AS the service account
-
----
-
-## Local development
-
-```bash
-cd Quill/
-ast project configure        # set the 4 required env vars
-ast project start --background
-# → playground at http://localhost:3100
-```
-
-Dev mode has `bun --watch` enabled, so most code edits hot-reload. New npm dependencies or `astropods.yml` changes require `ast project start --rebuild`.
-
-```bash
-ast project logs              # tail container output (timing logs from each tool)
-ast project stop              # tear down
-```
+One-time admin setup:
+1. Create the service-account user in Atlassian.
+2. Create the shared Confluence drafts space, grant "Add pages".
+3. Grant Jira `MKTG` "Create issue" permission.
+4. Generate an API token while signed in as the service account.
 
 ---
 
-## Deployment
+## Local dev & deployment
 
 ```bash
-# 1. Push the blueprint image
+ast project configure                       # set required env vars
+ast project start --background              # playground at http://localhost:3100
+ast project logs                            # tail container output
+```
+
+`bun --watch` hot-reloads code edits. `astropods.yml` or dependency changes need `ast project start --rebuild`.
+
+Deploy:
+
+```bash
 ast push
+ast secrets create TAVILY_API_KEY WP_USERNAME WP_APP_PASSWORD CONFLUENCE_API_TOKEN
 
-# 2. Create secrets in the account vault (once)
-ast secrets create TAVILY_API_KEY
-ast secrets create WP_USERNAME
-ast secrets create WP_APP_PASSWORD
-ast secrets create CONFLUENCE_API_TOKEN
-
-# 3. Deploy — secrets referenced with `@`, non-secret vars passed literally
 ast deploy @postman/quill \
-  --var TAVILY_API_KEY=@ \
-  --var WP_USERNAME=@ \
-  --var WP_APP_PASSWORD=@ \
+  --var TAVILY_API_KEY=@ --var WP_USERNAME=@ --var WP_APP_PASSWORD=@ \
   --var CONFLUENCE_API_TOKEN=@ \
-  --var CONFLUENCE_EMAIL=quill@postman.com \
-  --var CONFLUENCE_SPACE_KEY=QUILL \
-  --adapter web \
-  --adapter slack \
-  --name "Quill" \
-  --wait
-
-# 4. Connect Slack (one-time, Astro dashboard)
-#    Open deployed agent → Integrations → Slack → connect workspace
+  --var CONFLUENCE_EMAIL=service.quill@postman.com \
+  --var CONFLUENCE_SPACE_KEY=Quill \
+  --adapter web --adapter slack --name "Quill" --wait
 ```
 
-Subsequent deploys: `ast push && ast deploy @postman/quill --var … (same flags)`.
+Then connect Slack in the Astro dashboard: deployed agent → Integrations → Slack → connect workspace.
 
 ---
 
@@ -168,39 +126,37 @@ Subsequent deploys: `ast push && ast deploy @postman/quill --var … (same flags
 Quill/
 ├── astropods.yml              # blueprint spec
 ├── Dockerfile                 # bun runtime
-├── package.json
-├── tsconfig.json
 ├── PLAN.md                    # build history / decisions
 └── agent/
     ├── index.ts               # Mastra agent + serve()
-    ├── instructions.ts        # top-level system prompt (the orchestrator)
-    ├── prompts/               # blog-write, copyedit, blog-ideas system prompts
+    ├── instructions.ts        # top-level routing system prompt
+    ├── prompts/               # write, copyedit, ideas, shared style-guide
     ├── tools/                 # 12 tool definitions
     └── lib/
-        ├── anthropic.ts       # @anthropic-ai/sdk wrapper for tool-internal calls
-        ├── confluence.ts      # Confluence REST + per-user identity lookup
-        ├── markdown.ts        # frontmatter parser + marked wrapper
-        ├── scheduling.ts      # pure scheduling logic (Tue/Thu, US holidays)
-        └── wordpress.ts       # WP REST client
+        ├── anthropic.ts       # @anthropic-ai/sdk wrapper
+        ├── confluence.ts      # Confluence REST client
+        ├── jira.ts            # Jira REST v3 client (ADF)
+        ├── wordpress.ts       # WP REST client
+        ├── markdown.ts        # frontmatter + marked wrapper
+        └── scheduling.ts      # Tue/Thu + US holiday logic
 ```
 
 ---
 
 ## Editorial scheduling rules
 
-Encoded in `agent/lib/scheduling.ts` (pure functions, no API):
+Pure functions in `agent/lib/scheduling.ts` — no API calls:
 
-- **Time:** 8:00 AM PT (year-round Pacific time; Confluence/WP handle DST)
-- **Days:** Tue/Thu first (2-week window) → Wed/Mon fallback → never Fri/Sat/Sun
-- **Holidays:** US public holidays skipped — fixed (Jan 1, Jun 19, Jul 4, Nov 11, Dec 25) + floating (MLK, Presidents', Memorial, Labor, Columbus, Thanksgiving)
-- **Conflicts:** One post per day; rescheduling the same post to its own slot doesn't count as a conflict
-- **Embargo:** Optional per-post `embargo` date — Quill refuses slots before it
+- **Time:** 8:00 AM PT year-round.
+- **Days:** Tue/Thu first (2-week window) → Wed/Mon fallback → never Fri/Sat/Sun.
+- **Holidays:** US public holidays skipped (fixed + floating).
+- **Conflicts:** One post per day.
+- **Embargo:** Per-post `embargo` date honored.
 
 ---
 
 ## Limitations / roadmap
 
-- **No persistent state across container restarts.** Mastra memory is `:memory:` SQLite. Blog ideas don't dedupe across runs; conversation history resets if the container is rebuilt. Adding `knowledge: { cache: { provider: redis } }` lifts this.
-- **Per-user Confluence requires admin onboarding.** Adding a teammate today requires running 2 `ast secrets create` commands plus a redeploy. A self-serve registration flow needs a persistent user-mapping store.
-- **`scan_prod_updates` not built yet** — pulling the Postman product-updates Slack channel into a blog-ready brief is on the roadmap. Will require re-adding `SLACK_BOT_TOKEN` to `astropods.yml`.
-- **Slack adapter is platform-managed** — the agent never sees a Slack bot token. The `SLACK_BOT_TOKEN` env var only comes back if `scan_prod_updates` is added (it needs its own token for `conversations.history`).
+- **No persistent state.** Conversation memory resets on container rebuild; blog ideas don't dedupe across runs. Adding a persistent knowledge store lifts this.
+- **`scan_prod_updates` not built yet** — pulling Postman #product-updates into a blog-ready brief is on the roadmap and will need a Slack bot token.
+- **Slack adapter is platform-managed** — the agent never sees a Slack bot token unless `scan_prod_updates` adds one.

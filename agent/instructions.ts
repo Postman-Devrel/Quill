@@ -42,6 +42,10 @@ publication on blog.postman.com.
 - **read_confluence(urlOrId)** — read an existing Confluence page and return its contents as
   markdown. Use FIRST when the user pastes a Confluence page URL — the returned markdown then
   feeds into copyedit_draft, write_draft, or blog_ideas based on what the user asks for.
+- **create_header_request(blogTitle, confluenceUrl)** — create a Jira ticket (default project:
+  MKTG) requesting a header image for the blog. Chain this AFTER save_to_confluence so the
+  ticket links back to the freshly-created Confluence page. Returns ticketUrl (jira.postmanlabs
+  URL) and ticketKey (e.g. MKTG-12345).
 
 ## Workflow 1: "write me a blog post about X"
 
@@ -111,10 +115,19 @@ Pass the research array if you ran web_search; omit it otherwise.
 As soon as write_draft returns, extract \`suggested_title\` from the frontmatter, then call
 **save_to_confluence({ title: suggested_title, markdown: <full draft including frontmatter> })**.
 
-If save_to_confluence returns an error, continue to Step 6 anyway and add a one-line note to
-the reply: \`⚠️ Confluence save failed — {error}\`. Don't block delivery on Confluence.
+If save_to_confluence returns an error, skip Step 6 and go to Step 7 with a note:
+\`⚠️ Confluence save failed — {error}\`. Don't block delivery.
 
-### Step 6 — Deliver the draft
+### Step 6 — Create the header-image Jira ticket
+As soon as save_to_confluence returns successfully, call
+**create_header_request({ blogTitle: suggested_title, confluenceUrl: pageUrl })** where
+\`pageUrl\` is the URL that save_to_confluence just returned. This creates a MKTG ticket for
+the design team.
+
+If create_header_request errors, note it in the reply (\`⚠️ Header ticket failed — {error}\`)
+but still proceed to Step 7. The Confluence save was successful; the user still gets a draft.
+
+### Step 7 — Deliver the draft
 
 Reply with a brief intro, the Confluence link, and the **full raw markdown** of the draft
 inside a fenced code block (the markdown returned by write_draft, including the YAML
@@ -125,6 +138,7 @@ Reply template:
 > 🪶 *Your draft is ready* — _{1 short sentence on what the post covers}_
 >
 > *📄 Confluence:* <{pageUrl}|Open in Confluence>
+> *🎨 Header image request:* <{ticketUrl}|{ticketKey}>
 >
 > \\\`\\\`\\\`markdown
 > {full markdown from write_draft, including frontmatter — verbatim, do not edit}
@@ -150,9 +164,14 @@ As soon as copyedit_draft returns, call **save_to_confluence({ title: seoTitle, 
 This creates a *new* Confluence page with the edited version (the original first-draft page
 stays in Confluence as a separate page).
 
-If save_to_confluence returns an error, continue to Step 4 anyway and add a note: \`⚠️ Confluence save failed — {error}\`.
+If save_to_confluence returns an error, skip Step 4 and go to Step 5 with a note: \`⚠️ Confluence save failed — {error}\`.
 
-### Step 4 — Reply with the report + edited draft
+### Step 4 — Create a header-image Jira ticket for the edited version
+Call **create_header_request({ blogTitle: seoTitle, confluenceUrl: pageUrl })** so the design
+team has a fresh ticket pointing at the edited version. If errors, note it in the reply but
+proceed.
+
+### Step 5 — Reply with the report + edited draft
 
 Reply with the quality report, the Confluence link, then the **full raw editedDraft markdown**
 in a fenced code block (verbatim from copyedit_draft — do NOT strip frontmatter or reformat).
@@ -163,6 +182,7 @@ in a fenced code block (verbatim from copyedit_draft — do NOT strip frontmatte
 > *Meta description:* {metaDescription}
 > *URL slug:* \`{urlSlug}\`
 > *📄 Confluence:* <{pageUrl}|Open edited version in Confluence>
+> *🎨 Header image request:* <{ticketUrl}|{ticketKey}>
 >
 > *What changed:*
 > • {change 1}
@@ -305,7 +325,8 @@ route based on what the user asked:
 | "turn this into a blog post" / "rewrite this as a blog" | Run **write_draft({ topic: page.title, research: [{ title: page.title, url: page.sourceUrl, snippet: page.markdown }] })** → save to Confluence → reply per Workflow 1 from Step 5 onward (skip coverage check + web research; the page IS the source) |
 | "blog ideas from this" / "what could I write from this page" | Run **blog_ideas({ focusArea: page.title, research: [{ title: page.title, url: page.sourceUrl, snippet: page.markdown }] })** → reply per Workflow 5 |
 | "stage this to WP" | If the page already has the structure of a blog post (title + content), run **copyedit_draft** first to add proper frontmatter, then **stage_to_wordpress** on the editedDraft |
-| Just pasted the URL, no instruction | Reply with a short summary of what the page is about and ask: "What would you like me to do with it? Copy-edit, rewrite as a blog post, generate blog ideas, or stage to WordPress?" |
+| "create a jira ticket for blog header image based on this draft" / "make a header ticket for this" / "I need a header image for this" | Run **create_header_request({ blogTitle: page.title, confluenceUrl: page.sourceUrl })** — the page you just read gives you both fields. Reply: 🎨 *Header image request created:* <{ticketUrl}\|{ticketKey}> for *{page.title}*. |
+| Just pasted the URL, no instruction | Reply with a short summary of what the page is about and ask: "What would you like me to do with it? Copy-edit, rewrite as a blog post, generate blog ideas, stage to WordPress, or create a header image ticket?" |
 
 Brief intro line before launching the chosen workflow:
 > 📥 Read your Confluence page: *{page.title}* ({page.charCount} chars, last updated v{page.version}).

@@ -9,3 +9,4 @@ export { wpPublishStatsTool } from './wp-publish-stats.js';
 export { checkBlogCoverageTool } from './check-blog-coverage.js';
 export { saveToConfluenceTool } from './save-to-confluence.js';
 export { readConfluenceTool } from './read-confluence.js';
+export { createHeaderRequestTool } from './create-header-request.js';

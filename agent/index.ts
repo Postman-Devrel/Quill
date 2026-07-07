@@ -20,6 +20,7 @@ import {
   checkBlogCoverageTool,
   saveToConfluenceTool,
   readConfluenceTool,
+  createHeaderRequestTool,
 } from './tools/index.js';
 
 function resolveOtlpEndpoint(): string {
@@ -73,6 +74,7 @@ const agent = new Agent({
     check_blog_coverage: checkBlogCoverageTool,
     save_to_confluence: saveToConfluenceTool,
     read_confluence: readConfluenceTool,
+    create_header_request: createHeaderRequestTool,
   },
   defaultOptions: {
     tracingOptions: {
