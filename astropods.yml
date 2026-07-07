@@ -27,20 +27,17 @@ agent:
       datatype: string
       secret: true
       description: API token for the service account. Generate at id.atlassian.com while signed in AS the service account (not your personal account).
-    - name: CONFLUENCE_SPACE_KEY
-      datatype: string
-      secret: false
-      description: Key of the shared Confluence space where Quill saves ALL blog drafts (e.g. QUILL, BLOG-DRAFTS). Find it in any page URL under /wiki/spaces/{KEY}/pages/...
-    - name: CONFLUENCE_PARENT_PAGE_ID
-      datatype: string
-      secret: false
-      description: Optional. Numeric ID of a parent page under which to nest all drafts. Leave blank to save at the space root.
 
-# Jira header-ticket settings (project=MKTG, issue type=Task, Marketing
-# Team=Creative, base URL derived from CONFLUENCE_BASE_URL) live in
-# agent/lib/jira.ts as code-side defaults. They are intentionally NOT
-# exposed as inputs — users of the deployed agent shouldn't have to set
-# them. Change the defaults in code + redeploy if they need to move.
+# Postman DevRel-specific constants live in code as defaults:
+#   - Confluence destination:  space "Quill", parent page 8244560849
+#     (see agent/lib/confluence.ts)
+#   - Jira header tickets:     project MKTG, issue type Task,
+#                              Marketing Team "Creative", base URL
+#                              derived from CONFLUENCE_BASE_URL
+#     (see agent/lib/jira.ts)
+# These are intentionally NOT exposed as inputs — the deployed agent
+# should work with just the credential inputs above. Change the defaults
+# in code + redeploy if they need to move.
 
 models:
   anthropic:

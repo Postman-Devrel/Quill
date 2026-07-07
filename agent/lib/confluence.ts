@@ -112,13 +112,12 @@ export async function createConfluencePage(
 ): Promise<ConfluencePage & { identity: string }> {
   const { baseUrl, identity } = getConfluenceConfig();
   console.log(`[confluence] create as ${identity}`);
-  const spaceKey = params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY;
-  if (!spaceKey) {
-    throw new Error(
-      'CONFLUENCE_SPACE_KEY is not set. This is the key of the shared "Quill Drafts" Confluence space where all blog drafts get saved. Set it via `ast project configure` (locally) or `ast secrets create CONFLUENCE_SPACE_KEY` (for deploy).',
-    );
-  }
-  const parentId = params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID;
+  // Postman DevRel-specific defaults — the shared "Quill Drafts" space and
+  // its homepage. Env vars can still override, but users of the deployed
+  // agent don't need to configure them.
+  const spaceKey = params.spaceKey ?? process.env.CONFLUENCE_SPACE_KEY ?? 'Quill';
+  const parentId =
+    params.parentPageId ?? process.env.CONFLUENCE_PARENT_PAGE_ID ?? '8244560849';
 
   const html = await markdownToConfluenceHtml(params.markdown);
 

@@ -176,11 +176,14 @@ Astropods auto-injects `ANTHROPIC_API_KEY` because `astropods.yml` declares `mod
 | `WP_APP_PASSWORD` | ✅ | WP Application Password (not your login password) |
 | `CONFLUENCE_EMAIL` | ✅ | Service-account email — also authorizes Jira |
 | `CONFLUENCE_API_TOKEN` | ✅ | API token for the service account — one token, both products |
-| `CONFLUENCE_SPACE_KEY` | ✅ | Destination space (e.g. `Quill`) |
 | `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
-| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page |
 
-Jira header-ticket settings (`MKTG` project, `Task` issue type, `Marketing Team = Creative`, base URL derived from `CONFLUENCE_BASE_URL`, no auto-assignee) are hardcoded as defaults in [`agent/lib/jira.ts`](agent/lib/jira.ts). They are intentionally **not exposed as env vars** — change the defaults in code and redeploy if they need to move.
+Postman DevRel-specific constants are baked into the code:
+
+- **Confluence destination** — space `Quill`, parent page `8244560849` ([`agent/lib/confluence.ts`](agent/lib/confluence.ts))
+- **Jira header tickets** — project `MKTG`, issue type `Task`, `Marketing Team = Creative`, base URL derived from `CONFLUENCE_BASE_URL`, no auto-assignee ([`agent/lib/jira.ts`](agent/lib/jira.ts))
+
+Intentionally **not exposed as env vars** — change the defaults in code and redeploy if they need to move.
 
 ---
 

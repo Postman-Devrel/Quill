@@ -72,11 +72,14 @@ State is intentionally minimal — Mastra's in-memory store carries the active c
 | `TAVILY_API_KEY` | ✅ | Web search |
 | `WP_USERNAME` / `WP_APP_PASSWORD` | ✅ | blog.postman.com WordPress login (Application Password, not your login) |
 | `CONFLUENCE_EMAIL` / `CONFLUENCE_API_TOKEN` | ✅ | Atlassian service account (also authorizes Jira — one token, both products) |
-| `CONFLUENCE_SPACE_KEY` | ✅ | Destination space (e.g. `Quill`) |
 | `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
-| `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page |
 
-Jira header-ticket settings (`MKTG` project, `Task` issue type, `Marketing Team = Creative`, base URL derived from `CONFLUENCE_BASE_URL`) are hardcoded as defaults in [`agent/lib/jira.ts`](agent/lib/jira.ts). They are intentionally not exposed as env vars — change the defaults in code and redeploy if they need to move.
+Postman DevRel-specific constants are baked into the code:
+
+- Confluence destination: space `Quill`, parent page `8244560849` — [`agent/lib/confluence.ts`](agent/lib/confluence.ts)
+- Jira header tickets: project `MKTG`, issue type `Task`, `Marketing Team = Creative`, base URL derived from `CONFLUENCE_BASE_URL` — [`agent/lib/jira.ts`](agent/lib/jira.ts)
+
+Intentionally not exposed as env vars — change the defaults in code and redeploy if they need to move.
 
 ### Service-account pattern
 
