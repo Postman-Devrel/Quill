@@ -35,26 +35,12 @@ agent:
       datatype: string
       secret: false
       description: Optional. Numeric ID of a parent page under which to nest all drafts. Leave blank to save at the space root.
-    - name: JIRA_PROJECT_KEY
-      datatype: string
-      secret: false
-      description: Optional. Jira project key for header-image tickets. Defaults to "MKTG".
-    - name: JIRA_HEADER_ISSUE_TYPE
-      datatype: string
-      secret: false
-      description: Optional. Jira issue type for header-image tickets. Defaults to "Task".
-    - name: JIRA_MARKETING_TEAM
-      datatype: string
-      secret: false
-      description: Optional. Value for the required "Marketing Team" field on MKTG tickets (customfield_13620). Defaults to "Creative".
-    - name: JIRA_BASE_URL
-      datatype: string
-      secret: false
-      description: Optional. Base URL for Jira. Derived from CONFLUENCE_BASE_URL by stripping "/wiki" if unset. Override only if Jira lives at a different host.
-    - name: JIRA_HEADER_ASSIGNEE_ACCOUNT_ID
-      datatype: string
-      secret: false
-      description: Optional. Atlassian accountId to auto-assign header tickets to (e.g. a specific designer). Leave blank to leave unassigned.
+
+# Jira header-ticket settings (project=MKTG, issue type=Task, Marketing
+# Team=Creative, base URL derived from CONFLUENCE_BASE_URL) live in
+# agent/lib/jira.ts as code-side defaults. They are intentionally NOT
+# exposed as inputs — users of the deployed agent shouldn't have to set
+# them. Change the defaults in code + redeploy if they need to move.
 
 models:
   anthropic:

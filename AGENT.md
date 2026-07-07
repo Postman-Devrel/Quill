@@ -75,10 +75,8 @@ State is intentionally minimal — Mastra's in-memory store carries the active c
 | `CONFLUENCE_SPACE_KEY` | ✅ | Destination space (e.g. `Quill`) |
 | `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
 | `CONFLUENCE_PARENT_PAGE_ID` | optional | Nest drafts under a specific parent page |
-| `JIRA_PROJECT_KEY` | optional | Defaults to `MKTG` |
-| `JIRA_HEADER_ISSUE_TYPE` | optional | Defaults to `Task` |
-| `JIRA_MARKETING_TEAM` | optional | Required MKTG field. Defaults to `Creative` |
-| `JIRA_BASE_URL` | optional | Derived from `CONFLUENCE_BASE_URL` — override only if your Jira lives elsewhere |
+
+Jira header-ticket settings (`MKTG` project, `Task` issue type, `Marketing Team = Creative`, base URL derived from `CONFLUENCE_BASE_URL`) are hardcoded as defaults in [`agent/lib/jira.ts`](agent/lib/jira.ts). They are intentionally not exposed as env vars — change the defaults in code and redeploy if they need to move.
 
 ### Service-account pattern
 
