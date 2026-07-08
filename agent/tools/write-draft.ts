@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { generateText } from '../lib/anthropic.js';
-import { BLOG_WRITE_SYSTEM_PROMPT } from '../prompts/blog-write.js';
+import { getBlogWriteSystemPrompt } from '../prompts/blog-write.js';
 
 const researchSchema = z.object({
   title: z.string(),
@@ -35,8 +35,9 @@ export const writeDraftTool = createTool({
     const userPrompt = `Write a Postman developer-advocate blog post on the following topic:\n\n**${topic}**${researchBlock}\n\nReturn ONLY the markdown blog post with YAML frontmatter. No preamble, no explanation.`;
 
     try {
+      const systemPrompt = await getBlogWriteSystemPrompt();
       const draft = await generateText({
-        systemPrompt: BLOG_WRITE_SYSTEM_PROMPT,
+        systemPrompt,
         userPrompt,
         maxTokens: 8000,
       });

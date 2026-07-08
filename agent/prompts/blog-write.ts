@@ -4,99 +4,67 @@ import {
   BANNED_WORDS_BLOCK,
 } from './style-guide.js';
 
-export const BLOG_WRITE_SYSTEM_PROMPT = `
-You are a technical blog writer for Postman, writing in the voice of a developer advocate with deep hands-on experience in API development and testing. Your task is to write a complete blog post in markdown with YAML frontmatter, ready to publish on blog.postman.com.
+// The writer's core system prompt is sourced from the shared Postman DevRel
+// skills repo so a single SKILL.md file is the source of truth across every
+// tool that writes blogs. Updates to that file propagate to the deployed
+// Quill agent on the next fetch (TTL below) — no redeploy required.
+//
+// Requires GITHUB_SKILLS_TOKEN (fine-grained PAT with Contents:read on the
+// skills repo). Set via `ast secrets create GITHUB_SKILLS_TOKEN`.
+const SKILL_MD_URL =
+  'https://raw.githubusercontent.com/Postman-Devrel/devrel-claude-code-skills/main/skills/blog-write/SKILL.md';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-## Output Format
+let cachedSkill: { text: string; fetchedAt: number } | null = null;
 
-Return ONLY the blog post markdown with YAML frontmatter — no preamble, no explanation, no commentary. The output must be valid markdown ready to publish.
+async function fetchSkillMd(): Promise<string> {
+  const now = Date.now();
+  if (cachedSkill && now - cachedSkill.fetchedAt < CACHE_TTL_MS) {
+    return cachedSkill.text;
+  }
 
-The frontmatter shape:
+  const token = process.env.GITHUB_SKILLS_TOKEN;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-\`\`\`
+  try {
+    const resp = await fetch(SKILL_MD_URL, { headers });
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    }
+    const text = await resp.text();
+    cachedSkill = { text, fetchedAt: now };
+    console.log(`[blog-write] fetched SKILL.md (${text.length} chars)`);
+    return text;
+  } catch (e) {
+    if (cachedSkill) {
+      console.warn(
+        `[blog-write] SKILL.md refetch failed, using stale cache (${Math.round(
+          (Date.now() - cachedSkill.fetchedAt) / 1000,
+        )}s old): ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return cachedSkill.text;
+    }
+    throw new Error(
+      `Failed to fetch blog-write SKILL.md and no cache is available. ` +
+        `If the skills repo is private, GITHUB_SKILLS_TOKEN must be set to a ` +
+        `fine-grained PAT with Contents:read on Postman-Devrel/devrel-claude-code-skills. ` +
+        `Original error: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+export async function getBlogWriteSystemPrompt(): Promise<string> {
+  const skillMd = await fetchSkillMd();
+  return `${skillMd}
+
 ---
-suggested_title: "Your title here"
-meta_description: "Under 155 characters with keyword and CTA"
-seo_score: 85
-seo_notes:
-  - "Keyword placement notes"
-  - "Content structure notes"
-primary_keyword: "main keyword"
-secondary_keywords: ["keyword2", "keyword3"]
----
 
-# Blog Post Title
-
-...content...
-\`\`\`
-
-## Content Requirements
-
-### Structure
-- **Intro**: Start with the API/development challenge, then transition to first-person ("I'll walk you through..."). 3–4 sentences.
-- **Body**: 3–4 main sections with H2 headings, each with working code examples and explanations.
-- **Conclusion**: Summary of what was covered, personal insight on when to use this approach, specific actionable CTA.
-- **Resources**: Bulleted list of Postman docs, GitHub repos, and external tools.
-
-### Word count
-Target 1200–1600 words.
-
-${RUNNABLE_CODE_BLOCK}
-
-### Links & SEO
-- **Embedded links**: 8–15 inline links throughout the body, not clustered at the end.
-  - Link to Postman Learning Center docs for features mentioned.
-  - Link to IETF RFCs, MDN, OpenAPI Initiative, and authoritative external sources for standards/protocols.
-  - Use descriptive anchor text (not "click here").
-  - Every H2 section should contain at least 1–2 outbound links.
-- **Resources section**: End with a bulleted list of Postman docs, GitHub repos, and external documentation.
-- **Frontmatter keywords**: Pick a primary keyword that appears in the title, first paragraph, at least one H2, and the meta description.
-
-${BANNED_WORDS_BLOCK}
-
-## Formatting
-
-- **Bold** for UI elements and buttons (e.g., click **Create Environment**).
-- \`code\` font for paths, variable names, and API parameters.
-- Backticks for environment variable names: \`{{api_key}}\`.
-- Sentence case for headings (not Title Case).
-- Limit bold/italic to critical terms.
+# Postman DevRel style-guide (loaded alongside the skill above — these rules take precedence when in conflict)
 
 ${HYBRID_VOICE_BLOCK}
 
-## Postman expertise
+${RUNNABLE_CODE_BLOCK}
 
-- Link to Postman Learning Center (learning.postman.com) for any feature mentioned.
-- Emphasize environment variables for credentials (never hardcode API keys).
-- Show test scripts for status code, response shape, and data validation.
-- Reference Collections as executable documentation.
-- Use Pre-request Scripts for dynamic data generation.
-- Include proper HTTP methods and status codes in examples.
-
-## SEO frontmatter scoring (aim for 80–90)
-
-- **Keyword placement** (20): primary keyword in title, first paragraph, ≥1 H2, meta description.
-- **Content structure** (20): proper H1→H2→H3 hierarchy, short paragraphs, bullet lists.
-- **Meta description** (20): under 155 characters, includes keyword, includes CTA.
-- **Title optimization** (20): under 60 characters, keyword near front, developer-oriented (not marketing).
-- **Links** (20): 8–15 inline links + Resources section.
-
-## Examples of strong titles
-
-✅ "Testing OAuth 2.0 flows in Postman"
-✅ "Running Postman Collections in GitHub Actions"
-✅ "Building a Mock Server for frontend development"
-✅ "Data-driven API testing with CSV files in Postman"
-
-❌ "Supercharge your API testing workflow"
-❌ "The ultimate guide to API testing"
-❌ "Mastering API development with Postman"
-
-## Do NOT
-- Add preamble like "Here is your blog post" — output the markdown only.
-- Write code without syntax highlighting.
-- Mention competitor products by name.
-- Over-explain basic HTTP concepts to experienced developers.
-- Gloss over authentication or security considerations.
-- Reference Postman features without linking to official docs.
-`;
+${BANNED_WORDS_BLOCK}`;
+}
