@@ -9,6 +9,7 @@ import {
 import {
   findOrCreateTags,
   findPostByExactTitle,
+  findWpUserByName,
   createOrUpdatePost,
 } from '../lib/wordpress.js';
 
@@ -34,8 +35,12 @@ export const stageToWordPressTool = createTool({
       .describe(
         'Optional explicit tag list. Defaults to primary_keyword + secondary_keywords from frontmatter. Max 5 tags.',
       ),
+    authorName: z
+      .string()
+      .optional()
+      .describe('Author name or WordPress login slug to attribute the post to. If provided, the tool looks up the matching WP user ID. Always ask the user who the author should be before staging.'),
   }),
-  execute: async ({ markdown, titleOverride, metaDescriptionOverride, tagsOverride }) => {
+  execute: async ({ markdown, titleOverride, metaDescriptionOverride, tagsOverride, authorName }) => {
     const t0 = Date.now();
     console.log(`[stage_to_wordpress] start: ${markdown.length} chars`);
     try {
@@ -68,10 +73,21 @@ export const stageToWordPressTool = createTool({
       const resolvedTags = tagNames.length > 0 ? await findOrCreateTags(tagNames) : [];
       const tagIds = resolvedTags.map((t) => t.id);
 
-      // Step 4 — check for an existing post with this title to avoid duplication
+      // Step 4 — resolve author (optional)
+      let authorId: number | undefined;
+      let resolvedAuthor: string | undefined;
+      if (authorName) {
+        const user = await findWpUserByName(authorName);
+        if (user) {
+          authorId = user.id;
+          resolvedAuthor = user.name;
+        }
+      }
+
+      // Step 5 — check for an existing post with this title to avoid duplication
       const existing = await findPostByExactTitle(title);
 
-      // Step 5 — create or update
+      // Step 6 — create or update
       const post = await createOrUpdatePost({
         title,
         htmlContent,
@@ -79,9 +95,10 @@ export const stageToWordPressTool = createTool({
         focusKeyphrase: focusKeyphrase || undefined,
         tagIds: tagIds.length > 0 ? tagIds : undefined,
         postId: existing?.id,
+        authorId,
       });
 
-      console.log(`[stage_to_wordpress] done in ${Date.now() - t0}ms (${existing ? 'updated' : 'created'} #${post.id})`);
+      console.log(`[stage_to_wordpress] done in ${Date.now() - t0}ms (${existing ? 'updated' : 'created'} #${post.id}${authorId ? ` author=${authorId}` : ''})`);
       return {
         success: true,
         action: existing ? 'updated' : 'created',
@@ -91,6 +108,7 @@ export const stageToWordPressTool = createTool({
         editUrl: post.editLink,
         previewUrl: post.link,
         tags: resolvedTags,
+        author: resolvedAuthor ?? null,
       };
     } catch (e) {
       console.log(`[stage_to_wordpress] error in ${Date.now() - t0}ms: ${e instanceof Error ? e.message : String(e)}`);

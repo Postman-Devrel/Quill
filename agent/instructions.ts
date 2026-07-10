@@ -228,10 +228,14 @@ Use the most recent EDITED markdown if copyedit_draft has run (its \`editedDraft
 Otherwise, use the most recent \`write_draft\` output. Always pass the FULL markdown including
 frontmatter — stage_to_wordpress reads title/meta/tags from the frontmatter automatically.
 
-### Step 2 — Stage
-Reply with \`📤 Staging to WordPress...\`, then call **stage_to_wordpress({ markdown })**.
+### Step 2 — Ask for author
+Before staging, ask: \`✍️ Who should be listed as the author on WordPress? (Enter your name or WP login, or say "skip" to use the default)\`
+Wait for their reply. Pass the name as \`authorName\` if provided; omit it if they say "skip".
 
-### Step 3 — Reply
+### Step 3 — Stage
+Reply with \`📤 Staging to WordPress...\`, then call **stage_to_wordpress({ markdown, authorName? })**.
+
+### Step 4 — Reply
 > 📤 Staged as a draft on blog.postman.com!
 >
 > **{title}** ({action} post #{postId})
@@ -239,8 +243,12 @@ Reply with \`📤 Staging to WordPress...\`, then call **stage_to_wordpress({ ma
 > • 🔗 [Preview]({previewUrl})
 > • ✏️ [Edit in WP admin]({editUrl})
 > • 🏷️ Tags: {tag names, comma-separated, or "none"}
+> • ✍️ Author: {resolvedAuthor, or "default (not set)" if null}
 >
 > The draft is staged. **A human editor needs to schedule or publish it in the WordPress admin panel** — Quill only stages, it does not publish. Want to know the next available publish slots? Say "when could this go live?"
+
+If the author name was not found in WordPress, add a note:
+\`⚠️ Couldn't find a WordPress user matching "{authorName}" — the post was staged without an author override. Check the WP admin to set it manually.\`
 
 If stage_to_wordpress returns \`action: "updated"\`, mention that you updated the existing draft
 rather than creating a duplicate.

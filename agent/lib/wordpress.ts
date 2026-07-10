@@ -154,6 +154,22 @@ export async function findPostByExactTitle(title: string): Promise<ExistingPost 
     : null;
 }
 
+/**
+ * Look up a WordPress user ID by display name or login slug.
+ * Returns null if no match found — caller decides whether to error or proceed without author.
+ */
+export async function findWpUserByName(name: string): Promise<{ id: number; name: string; slug: string } | null> {
+  const resp = await wpFetch(`/users?search=${encodeURIComponent(name)}&per_page=10&context=edit`);
+  if (!resp.ok) return null;
+  const users = (await resp.json()) as Array<{ id: number; name: string; slug: string }>;
+  if (users.length === 0) return null;
+  const needle = name.trim().toLowerCase();
+  return (
+    users.find((u) => u.name.toLowerCase() === needle || u.slug.toLowerCase() === needle) ??
+    users[0]
+  );
+}
+
 export interface CreateOrUpdatePostParams {
   title: string;
   htmlContent: string;
@@ -161,6 +177,7 @@ export interface CreateOrUpdatePostParams {
   focusKeyphrase?: string;
   tagIds?: number[];
   postId?: number; // omit to create new
+  authorId?: number;
 }
 
 export interface CreatedOrUpdatedPost {
@@ -298,6 +315,7 @@ export async function createOrUpdatePost(
     },
   };
   if (params.tagIds?.length) postData.tags = params.tagIds;
+  if (params.authorId) postData.author = params.authorId;
 
   const path = params.postId ? `/posts/${params.postId}` : '/posts';
   const method = params.postId ? 'PUT' : 'POST';
