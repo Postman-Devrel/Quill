@@ -48,13 +48,13 @@ export const copyeditDraftTool = createTool({
   execute: async ({ markdown }) => {
     const t0 = Date.now();
     console.log(`[copyedit_draft] start: ${markdown.length} chars`);
-    const userPrompt = `Copy-edit the following blog post. Apply all corrections directly and return the JSON object described in the system prompt.\n\n---\n\n${markdown}`;
+    const userPrompt = `Copy-edit the following blog post. Apply all corrections directly and return the JSON object described in the system prompt.\n\nIMPORTANT: The editedDraft MUST end with a "## Resources" section listing 3–6 real, verifiable URLs relevant to the topic. If the draft already has one, keep and improve it. If it is missing, add it.\n\n---\n\n${markdown}`;
 
     try {
       const raw = await generateText({
         systemPrompt: await getCopyeditSystemPrompt(),
         userPrompt,
-        maxTokens: 5000,
+        maxTokens: 6000,
       });
       const result = validateCopyeditResult(parseJsonResponse(raw));
       console.log(`[copyedit_draft] done in ${Date.now() - t0}ms (quality=${result.qualityScore}, ${result.changes.length} changes, ${result.flags.length} flags)`);

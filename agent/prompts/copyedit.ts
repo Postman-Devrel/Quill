@@ -20,7 +20,7 @@ Return ONLY a single valid JSON object. No preamble, no markdown fences, no comm
   "flags": ["Concise description of a risky suggestion the writer should review"]
 }
 
-- \`editedDraft\` — the FULL corrected post. This is what gets staged to WordPress.
+- \`editedDraft\` — the FULL corrected post. This is what gets staged to WordPress. It MUST end with a "## Resources" section listing 3–6 real, verifiable URLs relevant to the topic. If the draft already has a Resources section, keep and improve it. If it is missing, add one before closing.
 - \`changes\` — auto-applied edits (mechanical, safe fixes). 5–12 items typical.
 - \`flags\` — suggestions NOT applied (structural rewrites, voice changes). Empty array if none.
 - \`qualityScore\` — integer 1–10 after your edits.
