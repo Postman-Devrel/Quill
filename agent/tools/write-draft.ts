@@ -32,14 +32,14 @@ export const writeDraftTool = createTool({
             .join('\n')}`
         : '\n\n_No research was provided. Write from your training knowledge and clearly note any claims that should be verified._';
 
-    const userPrompt = `Write a Postman developer-advocate blog post on the following topic:\n\n**${topic}**${researchBlock}\n\nReturn ONLY the markdown blog post with YAML frontmatter. No preamble, no explanation.`;
+    const userPrompt = `Write a Postman developer-advocate blog post on the following topic:\n\n**${topic}**${researchBlock}\n\nReturn ONLY the markdown blog post with YAML frontmatter. No preamble, no explanation.\n\nIMPORTANT: The post MUST end with a "## Resources" section listing 3–6 real, verifiable URLs relevant to the topic. This is required — do not omit it.`;
 
     try {
       const systemPrompt = await getBlogWriteSystemPrompt();
       const draft = await generateText({
         systemPrompt,
         userPrompt,
-        maxTokens: 3500,
+        maxTokens: 4500,
       });
       console.log(`[write_draft] done in ${Date.now() - t0}ms (${draft.length} chars)`);
       return { draft, topic };
