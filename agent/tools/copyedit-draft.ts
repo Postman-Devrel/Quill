@@ -54,7 +54,7 @@ export const copyeditDraftTool = createTool({
       const raw = await generateText({
         systemPrompt: await getCopyeditSystemPrompt(),
         userPrompt,
-        maxTokens: 6000,
+        maxTokens: 8000,
       });
       const result = validateCopyeditResult(parseJsonResponse(raw));
       console.log(`[copyedit_draft] done in ${Date.now() - t0}ms (quality=${result.qualityScore}, ${result.changes.length} changes, ${result.flags.length} flags)`);

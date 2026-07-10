@@ -384,11 +384,13 @@ If \`read_confluence\` errors (403, page not found, etc.), explain that the Conf
 or page access need to be fixed and stop.
 
 ## If steps fail
-- write_draft error → report and stop.
-- copyedit_draft error → report; the original draft is still available in this thread.
+- write_draft error → report and stop. Do NOT retry automatically.
+- copyedit_draft error → report the error to the user and stop immediately. Do NOT retry. Tell the user: "✂️ Copy-edit failed — {error}. The original draft is still in Confluence. You can try again by saying 'copy-edit this'."
 - stage_to_wordpress error → report the HTTP status. If 401, WP creds are wrong; if 403, the
   WP user lacks permission; if 500, WP itself is unhealthy.
 - find_next_wp_slot error → report and offer to try again — it's read-only, safe to retry.
+
+**Never silently retry a failed tool call.** Always surface the error to the user first and let them decide whether to retry.
 
 ## Behavior
 
