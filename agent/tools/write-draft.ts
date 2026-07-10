@@ -39,7 +39,7 @@ export const writeDraftTool = createTool({
       const draft = await generateText({
         systemPrompt,
         userPrompt,
-        maxTokens: 8000,
+        maxTokens: 3500,
       });
       console.log(`[write_draft] done in ${Date.now() - t0}ms (${draft.length} chars)`);
       return { draft, topic };

@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { generateText, parseJsonResponse } from '../lib/anthropic.js';
-import { BLOG_IDEAS_SYSTEM_PROMPT } from '../prompts/blog-ideas.js';
+import { getBlogIdeasSystemPrompt } from '../prompts/blog-ideas.js';
 
 interface BlogIdea {
   title: string;
@@ -82,9 +82,10 @@ export const blogIdeasTool = createTool({
 
     try {
       const raw = await generateText({
-        systemPrompt: BLOG_IDEAS_SYSTEM_PROMPT,
+        systemPrompt: await getBlogIdeasSystemPrompt(),
         userPrompt,
-        maxTokens: 6000,
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens: 2500,
       });
       const result = validateIdeasResult(parseJsonResponse(raw));
       console.log(`[blog_ideas] done in ${Date.now() - t0}ms (${result.ideas.length} ideas)`);

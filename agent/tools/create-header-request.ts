@@ -25,8 +25,12 @@ export const createHeaderRequestTool = createTool({
       .string()
       .optional()
       .describe('Marketing Team option (MKTG required field). Defaults to JIRA_MARKETING_TEAM env var, or "Creative" if unset.'),
+    dueDate: z
+      .string()
+      .optional()
+      .describe('Due date for the header image in YYYY-MM-DD format. Ask the user before calling if not already provided.'),
   }),
-  execute: async ({ blogTitle, confluenceUrl, projectKey, issueType, marketingTeam }) => {
+  execute: async ({ blogTitle, confluenceUrl, projectKey, issueType, marketingTeam, dueDate }) => {
     const t0 = Date.now();
     console.log(`[create_header_request] start: title=${JSON.stringify(blogTitle)}`);
     try {
@@ -36,6 +40,7 @@ export const createHeaderRequestTool = createTool({
         projectKey,
         issueType,
         marketingTeam,
+        dueDate,
       });
       console.log(
         `[create_header_request] done in ${Date.now() - t0}ms (key=${result.key})`,

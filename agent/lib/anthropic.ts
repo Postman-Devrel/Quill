@@ -18,7 +18,6 @@ export interface GenerateOptions {
   userPrompt: string;
   model?: string;
   maxTokens?: number;
-  temperature?: number;
 }
 
 /**
@@ -29,10 +28,11 @@ export interface GenerateOptions {
 export async function generateText(opts: GenerateOptions): Promise<string> {
   const anthropic = getAnthropicClient();
   const response = await anthropic.messages.create({
-    model: opts.model ?? 'claude-sonnet-4-5',
+    model: opts.model ?? 'claude-opus-4-7',
     max_tokens: opts.maxTokens ?? 8000,
-    temperature: opts.temperature ?? 1.0,
-    system: opts.systemPrompt,
+    // Cache the system prompt at Anthropic — large SKILL.md prompts hit cache
+    // after the first call, cutting TTFT significantly on repeated invocations.
+    system: [{ type: 'text', text: opts.systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: opts.userPrompt }],
   });
 

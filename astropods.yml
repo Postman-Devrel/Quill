@@ -27,10 +27,6 @@ agent:
       datatype: string
       secret: true
       description: API token for the service account. Generate at id.atlassian.com while signed in AS the service account (not your personal account).
-    - name: GITHUB_SKILLS_TOKEN
-      datatype: string
-      secret: true
-      description: GitHub fine-grained PAT with Contents:read on Postman-Devrel/devrel-claude-code-skills. Lets blog-write.ts fetch the shared SKILL.md at runtime so prompt updates propagate without a redeploy.
 
 # Postman DevRel-specific constants live in code as defaults:
 #   - Confluence destination:  space "Quill", parent page 8244560849

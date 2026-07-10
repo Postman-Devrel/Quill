@@ -36,6 +36,26 @@ Developers don't just read; they type, run, and modify. Every code block is a co
 - **Progressive complexity.** Start with the simplest working version. Add features one at a time in later snippets, not all at once.
 - **Never fabricate.** If uncertain about exact syntax or output, use \`[INSERT CODE EXAMPLE]\` as a placeholder rather than guessing.
 - **Environment variables for secrets.** Never hardcode API keys — reference \`{{api_key}}\` (Postman) or \`process.env.API_KEY\` (Node) etc.
+
+### When to use Postman-specific code blocks
+
+Not every blog post needs Postman syntax. Use this to decide:
+
+**Always use Postman examples** (Collections, Environments, \`{{variables}}\`, Postman CLI, Tests, Pre-request Scripts):
+- Step-by-step tutorials where Postman is the tool being taught
+- How-to posts that walk through a Postman workflow end-to-end
+- Posts about Postman features directly (Mock Servers, Monitors, Flows, Agent Mode)
+
+**Use generic code examples** (curl, JavaScript, Python, HTTP — NOT Postman-specific syntax):
+- Conceptual posts explaining a protocol, pattern, or standard (OAuth 2.0, REST principles, API design, OpenAPI)
+- Posts where Postman is one option among many — show the concept in a language-neutral way, then optionally note "you can also do this in Postman"
+- Opinion or analysis posts where code illustrates a point but isn't a tutorial
+
+**No code required:**
+- Trend analysis, predictions, or thought-leadership posts
+- Posts that are primarily explanatory prose with diagrams or architecture descriptions
+
+**The test:** Ask — "Would a developer who doesn't use Postman still find this code example useful?" If yes, write generic code. If the post is specifically about using Postman, write Postman-specific examples.
 `;
 
 export const BANNED_WORDS_BLOCK = `

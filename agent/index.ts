@@ -60,7 +60,7 @@ const agent = new Agent({
   id: 'quill',
   name: 'Quill',
   instructions: () => QUILL_INSTRUCTIONS,
-  model: 'anthropic/claude-sonnet-4-5',
+  model: 'anthropic/claude-opus-4-7',
   memory,
   tools: {
     web_search: webSearchTool,
@@ -86,4 +86,19 @@ const agent = new Agent({
 
 new Mastra({ agents: { quill: agent }, observability });
 
-serve(new MastraAdapter(agent));
+// MastraAdapter calls agent.stream() without maxSteps, defaulting to 5 — far
+// too low for Quill's multi-tool pipelines. Proxy the agent to inject a higher
+// limit. All non-stream properties are bound to the original target so private
+// class fields (#instructions etc.) remain accessible.
+const agentWithMaxSteps = new Proxy(agent, {
+  get(target, prop) {
+    if (prop === 'stream') {
+      return (messages: unknown, options: Record<string, unknown> = {}) =>
+        (target as unknown as Record<string, Function>).stream(messages, { ...options, maxSteps: 25 });
+    }
+    const value = (target as unknown as Record<string, unknown>)[prop as string];
+    return typeof value === 'function' ? (value as Function).bind(target) : value;
+  },
+});
+
+serve(new MastraAdapter(agentWithMaxSteps as unknown as typeof agent));

@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { generateText, parseJsonResponse } from '../lib/anthropic.js';
-import { COPYEDIT_SYSTEM_PROMPT } from '../prompts/copyedit.js';
+import { getCopyeditSystemPrompt } from '../prompts/copyedit.js';
 
 interface CopyeditResult {
   editedDraft: string;
@@ -52,9 +52,9 @@ export const copyeditDraftTool = createTool({
 
     try {
       const raw = await generateText({
-        systemPrompt: COPYEDIT_SYSTEM_PROMPT,
+        systemPrompt: await getCopyeditSystemPrompt(),
         userPrompt,
-        maxTokens: 8000,
+        maxTokens: 5000,
       });
       const result = validateCopyeditResult(parseJsonResponse(raw));
       console.log(`[copyedit_draft] done in ${Date.now() - t0}ms (quality=${result.qualityScore}, ${result.changes.length} changes, ${result.flags.length} flags)`);

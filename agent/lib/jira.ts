@@ -99,6 +99,7 @@ export interface CreateHeaderRequestParams {
   assigneeAccountId?: string;
   labels?: string[];
   marketingTeam?: string;
+  dueDate?: string;
 }
 
 export interface CreatedJiraIssue {
@@ -136,8 +137,12 @@ export async function createHeaderRequestIssue(
       adfLink(params.confluenceUrl, params.confluenceUrl),
     ),
     adfParagraph(
+      adfBold('Please note: '),
+      adfText('This is a feature request. Please attach the final header image to this ticket when ready.'),
+    ),
+    adfParagraph(
       adfText(
-        'This ticket was created automatically by Quill 🪶. Please attach the final header image to this ticket when ready.',
+        'This ticket was created automatically by Quill 🪶.',
       ),
     ),
   );
@@ -155,6 +160,9 @@ export async function createHeaderRequestIssue(
   };
   if (assigneeAccountId) {
     fields.assignee = { accountId: assigneeAccountId };
+  }
+  if (params.dueDate) {
+    fields.duedate = params.dueDate;
   }
 
   const resp = await jiraFetch('/rest/api/3/issue', {
