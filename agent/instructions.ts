@@ -183,7 +183,7 @@ The most recent draft is in this conversation's history (returned by write_draft
 Reply with \`✂️ Copy-editing — about 30 seconds...\`, then call **copyedit_draft({ markdown })**.
 
 ### Step 3 — Save edited version to Confluence
-As soon as copyedit_draft returns, call **save_to_confluence({ title: seoTitle, markdown: editedDraft })**.
+As soon as copyedit_draft returns, call **save_to_confluence({ title: seoTitle + " [Copy Edited]", markdown: editedDraft })**.
 This creates a *new* Confluence page with the edited version (the original first-draft page
 stays in Confluence as a separate page).
 
