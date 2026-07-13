@@ -94,6 +94,7 @@ function adfDoc(...paragraphs: AdfNode[]): AdfNode {
 export interface CreateHeaderRequestParams {
   blogTitle: string;
   confluenceUrl: string;
+  author?: string;
   projectKey?: string;
   issueType?: string;
   assigneeAccountId?: string;
@@ -127,11 +128,17 @@ export async function createHeaderRequestIssue(
     params.marketingTeam ?? process.env.JIRA_MARKETING_TEAM ?? 'Creative';
 
   const summary = `Header image request for blog: ${params.blogTitle}`;
+
+  const authorParagraph = params.author
+    ? adfParagraph(adfBold('Author: '), adfText(params.author))
+    : adfParagraph(adfBold('Author: '), adfText('Unknown'));
+
   const description = adfDoc(
     adfParagraph(
       adfText('Header image request for blog: '),
       adfBold(params.blogTitle),
     ),
+    authorParagraph,
     adfParagraph(
       adfText('Confluence draft: '),
       adfLink(params.confluenceUrl, params.confluenceUrl),
@@ -141,9 +148,7 @@ export async function createHeaderRequestIssue(
       adfText('This is a feature request. Please attach the final header image to this ticket when ready.'),
     ),
     adfParagraph(
-      adfText(
-        'This ticket was created automatically by Quill 🪶.',
-      ),
+      adfText('This ticket was created automatically by Quill 🪶.'),
     ),
   );
 

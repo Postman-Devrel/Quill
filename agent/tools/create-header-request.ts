@@ -25,14 +25,17 @@ export const createHeaderRequestTool = createTool({
       .string()
       .optional()
       .describe('Marketing Team option (MKTG required field). Defaults to JIRA_MARKETING_TEAM env var, or "Creative" if unset.'),
+    author: z
+      .string()
+      .describe('Full name of the blog post author (e.g. "Jane Smith"). ALWAYS ask the user "Who is the author of this post?" before calling this tool if the author is not already known from context.'),
     dueDate: z
       .string()
       .optional()
       .describe('Due date for the header image in YYYY-MM-DD format. Ask the user before calling if not already provided.'),
   }),
-  execute: async ({ blogTitle, confluenceUrl, projectKey, issueType, marketingTeam, dueDate }) => {
+  execute: async ({ blogTitle, confluenceUrl, projectKey, issueType, marketingTeam, author, dueDate }) => {
     const t0 = Date.now();
-    console.log(`[create_header_request] start: title=${JSON.stringify(blogTitle)}`);
+    console.log(`[create_header_request] start: title=${JSON.stringify(blogTitle)}, author=${JSON.stringify(author)}`);
     try {
       const result = await createHeaderRequestIssue({
         blogTitle,
@@ -40,6 +43,7 @@ export const createHeaderRequestTool = createTool({
         projectKey,
         issueType,
         marketingTeam,
+        author,
         dueDate,
       });
       console.log(

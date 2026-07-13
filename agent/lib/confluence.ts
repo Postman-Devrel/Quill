@@ -164,7 +164,7 @@ export async function createConfluencePage(
 // Read a page
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PAGE_URL_RE = /\/pages\/(\d+)/;
+const PAGE_URL_RE = /\/pages\/(?:edit-v2\/)?(\d+)/;
 const RAW_ID_RE = /^\d+$/;
 
 export function extractConfluencePageId(input: string): string {
