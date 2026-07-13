@@ -21,6 +21,7 @@ import {
   saveToConfluenceTool,
   readConfluenceTool,
   createHeaderRequestTool,
+  updateJiraTicketTool,
 } from './tools/index.js';
 
 function resolveOtlpEndpoint(): string {
@@ -75,6 +76,7 @@ const agent = new Agent({
     save_to_confluence: saveToConfluenceTool,
     read_confluence: readConfluenceTool,
     create_header_request: createHeaderRequestTool,
+    update_jira_ticket: updateJiraTicketTool,
   },
   defaultOptions: {
     tracingOptions: {

@@ -189,3 +189,100 @@ export async function createHeaderRequestIssue(
     identity,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Update issue
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface UpdateJiraIssueParams {
+  issueKey: string;
+  summary?: string;
+  author?: string;
+  confluenceUrl?: string;
+  dueDate?: string;
+  assigneeAccountId?: string;
+  labels?: string[];
+  comment?: string;
+}
+
+export interface UpdatedJiraIssue {
+  key: string;
+  ticketUrl: string;
+  identity: string;
+}
+
+export async function updateJiraIssue(params: UpdateJiraIssueParams): Promise<UpdatedJiraIssue> {
+  const { baseUrl, identity } = getJiraConfig();
+  console.log(`[jira] update ${params.issueKey} as ${identity}`);
+
+  const fields: Record<string, unknown> = {};
+  if (params.summary) fields.summary = params.summary;
+  if (params.dueDate) fields.duedate = params.dueDate;
+  if (params.assigneeAccountId) fields.assignee = { accountId: params.assigneeAccountId };
+  if (params.labels) fields.labels = params.labels;
+
+  if (params.author !== undefined || params.confluenceUrl !== undefined) {
+    const currentResp = await jiraFetch(
+      `/rest/api/3/issue/${params.issueKey}?fields=summary,description`,
+    );
+    if (!currentResp.ok) {
+      const err = await currentResp.text();
+      throw new Error(`Jira fetch issue failed: HTTP ${currentResp.status} — ${err.slice(0, 500)}`);
+    }
+    const current = (await currentResp.json()) as {
+      fields: { summary?: string; description?: unknown };
+    };
+
+    const blogTitle = params.summary ?? (current.fields.summary ?? '').replace(/^Header image request for blog:\s*/, '');
+    const author = params.author ?? 'Unknown';
+    const confluenceUrl = params.confluenceUrl ?? '';
+
+    const descParagraphs: AdfNode[] = [
+      adfParagraph(adfText('Header image request for blog: '), adfBold(blogTitle)),
+      adfParagraph(adfBold('Author: '), adfText(author)),
+    ];
+    if (confluenceUrl) {
+      descParagraphs.push(
+        adfParagraph(adfText('Confluence draft: '), adfLink(confluenceUrl, confluenceUrl)),
+      );
+    }
+    descParagraphs.push(
+      adfParagraph(
+        adfBold('Please note: '),
+        adfText('This is a feature request. Please attach the final header image to this ticket when ready.'),
+      ),
+      adfParagraph(adfText('This ticket was created automatically by Quill 🪶.')),
+    );
+    fields.description = adfDoc(...descParagraphs);
+  }
+
+  if (Object.keys(fields).length > 0) {
+    const putResp = await jiraFetch(`/rest/api/3/issue/${params.issueKey}`, {
+      method: 'PUT',
+      jsonBody: { fields },
+    });
+    if (!putResp.ok) {
+      const err = await putResp.text();
+      throw new Error(`Jira update issue failed: HTTP ${putResp.status} — ${err.slice(0, 500)}`);
+    }
+  }
+
+  if (params.comment) {
+    const commentResp = await jiraFetch(`/rest/api/3/issue/${params.issueKey}/comment`, {
+      method: 'POST',
+      jsonBody: {
+        body: adfDoc(adfParagraph(adfText(params.comment))),
+      },
+    });
+    if (!commentResp.ok) {
+      const err = await commentResp.text();
+      throw new Error(`Jira add comment failed: HTTP ${commentResp.status} — ${err.slice(0, 500)}`);
+    }
+  }
+
+  return {
+    key: params.issueKey,
+    ticketUrl: `${baseUrl}/browse/${params.issueKey}`,
+    identity,
+  };
+}

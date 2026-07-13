@@ -10,3 +10,4 @@ export { checkBlogCoverageTool } from './check-blog-coverage.js';
 export { saveToConfluenceTool } from './save-to-confluence.js';
 export { readConfluenceTool } from './read-confluence.js';
 export { createHeaderRequestTool } from './create-header-request.js';
+export { updateJiraTicketTool } from './update-jira-ticket.js';
