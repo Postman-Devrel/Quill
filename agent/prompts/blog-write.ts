@@ -1,4 +1,4 @@
-import { HYBRID_VOICE_BLOCK, RUNNABLE_CODE_BLOCK, BANNED_WORDS_BLOCK } from './style-guide.js';
+import { HYBRID_VOICE_BLOCK, RUNNABLE_CODE_BLOCK, BANNED_WORDS_BLOCK, HUMANIZER_BLOCK } from './style-guide.js';
 import { readSkillMd } from '../lib/skill-md.js';
 
 export async function getBlogWriteSystemPrompt(): Promise<string> {
@@ -49,5 +49,7 @@ ${RUNNABLE_CODE_BLOCK}
 ${BANNED_WORDS_BLOCK}
 
 ${HYBRID_VOICE_BLOCK}
+
+${HUMANIZER_BLOCK}
 `;
 }

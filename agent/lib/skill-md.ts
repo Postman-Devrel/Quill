@@ -23,6 +23,42 @@ function stripFrontmatter(text: string): string {
   return end === -1 ? text : text.slice(end + 3).trimStart();
 }
 
+// After stripping, some SKILL.md sections still point at companion files with a
+// "Read `resources/foo.md`" directive (e.g. blog-write offloads its post-types
+// and final-checklist to resources/). Claude Code follows those reads at runtime;
+// the API agent can't, so we inline the referenced file's contents here. This
+// lets the SKILL.md stay byte-identical to the Claude Code plugin version while
+// still delivering the full guidance to the model.
+//
+// Only "Read `path`" directives are resolved. Bare mentions ("Using the patterns
+// catalogued in `...humanizer.md`") are left alone on purpose — humanizer.md is
+// delivered separately via HUMANIZER_BLOCK in prompts/style-guide.ts, and its
+// own reads live in the (stripped) Writing Style Guide section, so it never
+// double-injects here.
+function inlineResourceReads(text: string, skillName: string, skillsRoot: string): string {
+  const readDirective = /read\s+`([\w./-]+\.md)`/i;
+  return text
+    .split('\n')
+    .map((line) => {
+      const m = line.match(readDirective);
+      if (!m) return line;
+      const ref = m[1];
+      if (!ref.includes('resources/')) return line;
+      const filePath = ref.startsWith('skills/')
+        ? join(skillsRoot, ref) // e.g. skills/blog-write/resources/foo.md
+        : join(skillsRoot, skillName, ref); // e.g. resources/foo.md, relative to this skill
+      try {
+        const content = readFileSync(filePath, 'utf8').trim();
+        // Drop a leading top-level "# Heading" so it doesn't collide with the
+        // "## Section" heading that already precedes the Read directive.
+        return content.replace(/^#\s+.*\n+/, '');
+      } catch {
+        return line; // file missing — leave the directive rather than blanking guidance
+      }
+    })
+    .join('\n');
+}
+
 function stripClaudeCodeSections(text: string): string {
   const lines = text.split('\n');
   const out: string[] = [];
@@ -71,7 +107,8 @@ export function readSkillMd(skillName: string): string {
     );
   }
 
-  const cleaned = stripClaudeCodeSections(stripFrontmatter(raw));
+  const stripped = stripClaudeCodeSections(stripFrontmatter(raw));
+  const cleaned = inlineResourceReads(stripped, skillName, skillsRoot);
   cache.set(skillName, cleaned);
   console.log(`[skill-md] loaded ${skillName} (${cleaned.length} chars after strip)`);
   return cleaned;

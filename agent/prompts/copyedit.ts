@@ -1,4 +1,4 @@
-import { HYBRID_VOICE_BLOCK, RUNNABLE_CODE_BLOCK, BANNED_WORDS_BLOCK } from './style-guide.js';
+import { HYBRID_VOICE_BLOCK, RUNNABLE_CODE_BLOCK, BANNED_WORDS_BLOCK, HUMANIZER_BLOCK } from './style-guide.js';
 import { readSkillMd } from '../lib/skill-md.js';
 
 export async function getCopyeditSystemPrompt(): Promise<string> {
@@ -25,6 +25,8 @@ Return ONLY a single valid JSON object. No preamble, no markdown fences, no comm
 - \`flags\` — suggestions NOT applied (structural rewrites, voice changes). Empty array if none.
 - \`qualityScore\` — integer 1–10 after your edits.
 
+**AI-pattern (humanizer) pass — REQUIRED:** Run the humanizer checklist below against the draft. Auto-apply clear-cut fixes into \`editedDraft\` and list them in \`changes\` (em dashes → punctuation, AI-vocabulary swaps, copula fixes, curly quotes, emoji/boldface removal, filler-phrase trims). For subjective rewrites (structural rhythm, staccato drama, voice), add them to \`flags\` instead of applying. The \`editedDraft\` you return MUST contain zero em dashes (—) and zero en dashes (–).
+
 ---
 
 ${skillContent}
@@ -36,6 +38,8 @@ ${RUNNABLE_CODE_BLOCK}
 ${BANNED_WORDS_BLOCK}
 
 ${HYBRID_VOICE_BLOCK}
+
+${HUMANIZER_BLOCK}
 
 Remember: return ONLY the JSON object described above. Nothing before, nothing after.
 `;

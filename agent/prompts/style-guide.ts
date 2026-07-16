@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 // Shared Postman DevRel style-guide blocks used by both blog-write and
 // copyedit prompts. Keeping the rules in one place prevents drift between
 // the two passes (writer avoids what editor would flag).
@@ -99,3 +102,48 @@ These are non-negotiable. The copy editor will remove or replace any of these on
 ### Competitors — never link, never name-drop
 Do not name or link to competing API tools by name. If a comparison is unavoidable, refer to "other API clients" or "similar tools" generically.
 `;
+
+// FULL port of skills/blog-write/resources/humanizer.md — the anti-AI-slop pass.
+// The block is built at import time from the resource file so the skills/ folder
+// stays the single source of truth (edit the .md, not this constant).
+//
+// We drop three sections that frame humanizer.md as a standalone "rewrite this
+// text and hand back draft + still-AI bullets + final rewrite" agent: "Your Task",
+// "Process and Output", and "Full Example". That deliverable format conflicts with
+// blog-write's "return ONLY the blog markdown" contract and copyedit's "return ONLY
+// JSON" contract. Everything else (Voice Calibration, PERSONALITY AND SOUL, all 33
+// patterns, DETECTION GUIDANCE) is kept verbatim.
+function buildHumanizerBlock(): string {
+  const path = join(process.cwd(), 'skills', 'blog-write', 'resources', 'humanizer.md');
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch {
+    // Never crash prompt assembly if the resource file is missing.
+    console.log('[style-guide] humanizer.md not found; HUMANIZER_BLOCK empty');
+    return '';
+  }
+
+  const DROP = new Set(['Your Task', 'Process and Output', 'Full Example']);
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of raw.split('\n')) {
+    const h2 = line.match(/^##\s+(.+?)\s*$/); // section headers in humanizer.md are level-2
+    if (h2) {
+      skipping = DROP.has(h2[1].trim());
+      if (skipping) continue;
+    }
+    if (!skipping) kept.push(line);
+  }
+  const body = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  return `
+## Avoid AI writing patterns (humanizer pass)
+
+The draft must not read as machine-generated. Apply the full pattern catalogue below while writing, then scan the finished draft and rewrite any instances you find. Do not just delete — rewrite so the point survives in a natural voice. The final text MUST contain zero em dashes (—) and zero en dashes (–); this is a hard constraint, not a preference.
+
+${body}
+`;
+}
+
+export const HUMANIZER_BLOCK = buildHumanizerBlock();
