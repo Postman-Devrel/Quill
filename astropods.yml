@@ -1,6 +1,9 @@
 # yaml-language-server: $schema=https://astropods.com/schema/package.json
-spec: package/v1
+spec: blueprint/v1
 name: "@postman/quill"
+
+meta:
+  visibility: public
 
 agent:
   build: { context: ., dockerfile: Dockerfile }

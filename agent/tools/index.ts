@@ -9,5 +9,8 @@ export { wpPublishStatsTool } from './wp-publish-stats.js';
 export { checkBlogCoverageTool } from './check-blog-coverage.js';
 export { saveToConfluenceTool } from './save-to-confluence.js';
 export { readConfluenceTool } from './read-confluence.js';
+export { readConfluenceCommentsTool } from './read-confluence-comments.js';
+export { updateConfluencePageTool } from './update-confluence-page.js';
+export { replyConfluenceCommentTool } from './reply-confluence-comment.js';
 export { createHeaderRequestTool } from './create-header-request.js';
 export { updateJiraTicketTool } from './update-jira-ticket.js';

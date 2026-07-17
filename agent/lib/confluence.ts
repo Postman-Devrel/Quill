@@ -231,3 +231,206 @@ export async function readConfluencePage(idOrUrl: string): Promise<FetchedConflu
     charCount: markdown.length,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read comments on a page (inline + footer)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ConfluenceComment {
+  commentId: string;
+  /** 'inline' = anchored to highlighted text; 'footer' = page-level. */
+  type: 'inline' | 'footer';
+  /** The comment text, converted to plain markdown. */
+  text: string;
+  /** Display name of whoever left the comment, if available. */
+  author: string;
+  /** For inline comments: the page text the comment is anchored to. */
+  highlightedText?: string;
+  /** Resolution status for inline comments: 'open' | 'resolved' | 'dangling'. */
+  resolution?: string;
+}
+
+/**
+ * Read all comments on a Confluence page — both inline (anchored to highlighted
+ * text) and footer (page-level). Returns them oldest-first as structured markdown
+ * so the agent can iterate over them one by one.
+ */
+export async function readConfluenceComments(idOrUrl: string): Promise<{
+  pageId: string;
+  comments: ConfluenceComment[];
+}> {
+  const pageId = extractConfluencePageId(idOrUrl);
+  const { identity } = getConfluenceConfig();
+  console.log(`[confluence] read comments as ${identity}`);
+
+  const turndown = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-',
+  });
+
+  const resp = await confluenceFetch(
+    `/rest/api/content/${pageId}/child/comment` +
+      `?expand=body.storage,extensions.inlineProperties,extensions.resolution,history.createdBy` +
+      `&depth=all&limit=100`,
+  );
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(
+      `Confluence read comments failed: HTTP ${resp.status} — ${err.slice(0, 500)}`,
+    );
+  }
+  const data = (await resp.json()) as {
+    results?: Array<{
+      id: string;
+      body?: { storage?: { value: string } };
+      history?: { createdBy?: { displayName?: string } };
+      extensions?: {
+        location?: string;
+        inlineProperties?: { originalSelection?: string };
+        resolution?: { status?: string };
+      };
+    }>;
+  };
+
+  const comments: ConfluenceComment[] = (data.results ?? []).map((c) => {
+    const html = c.body?.storage?.value ?? '';
+    const text = turndown.turndown(html).trim();
+    const isInline = c.extensions?.location === 'inline';
+    return {
+      commentId: c.id,
+      type: isInline ? 'inline' : 'footer',
+      text,
+      author: c.history?.createdBy?.displayName ?? 'Unknown',
+      highlightedText: c.extensions?.inlineProperties?.originalSelection,
+      resolution: c.extensions?.resolution?.status,
+    };
+  });
+
+  return { pageId, comments };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Update an existing page in place
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Overwrite an existing Confluence page with new markdown, bumping the version.
+ * Confluence keeps the previous version in its page history, so the original
+ * content is never lost. If `title` is omitted the current title is kept.
+ */
+export async function updateConfluencePage(params: {
+  idOrUrl: string;
+  markdown: string;
+  title?: string;
+}): Promise<ConfluencePage & { version: number; identity: string }> {
+  const pageId = extractConfluencePageId(params.idOrUrl);
+  const { baseUrl, identity } = getConfluenceConfig();
+  console.log(`[confluence] update ${pageId} as ${identity}`);
+
+  // Fetch current version + title so we can bump the version and preserve title.
+  const current = await confluenceFetch(
+    `/rest/api/content/${pageId}?expand=version,space`,
+  );
+  if (!current.ok) {
+    const err = await current.text();
+    throw new Error(
+      `Confluence update (fetch current) failed: HTTP ${current.status} — ${err.slice(0, 500)}`,
+    );
+  }
+  const currentPage = (await current.json()) as {
+    title: string;
+    space?: { key: string };
+    version?: { number: number };
+  };
+  const nextVersion = (currentPage.version?.number ?? 1) + 1;
+  const title = params.title ?? currentPage.title;
+
+  const html = await markdownToConfluenceHtml(params.markdown);
+
+  const resp = await confluenceFetch(`/rest/api/content/${pageId}`, {
+    method: 'PUT',
+    jsonBody: {
+      id: pageId,
+      type: 'page',
+      title,
+      version: { number: nextVersion },
+      body: { storage: { value: html, representation: 'storage' } },
+    },
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Confluence update failed: HTTP ${resp.status} — ${err.slice(0, 500)}`);
+  }
+  const page = (await resp.json()) as {
+    id: string;
+    title: string;
+    space?: { key: string };
+    _links?: { webui?: string };
+  };
+  const spaceKey = page.space?.key ?? currentPage.space?.key ?? '';
+  const webui = page._links?.webui ?? `/spaces/${spaceKey}/pages/${page.id}`;
+  return {
+    pageId: page.id,
+    title: page.title,
+    pageUrl: `${baseUrl}${webui}`,
+    spaceKey,
+    version: nextVersion,
+    identity,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reply to a comment
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Post a reply to an existing Confluence comment (inline or footer). The reply
+ * is nested under the parent comment so reviewers see the response in context.
+ */
+export async function replyToConfluenceComment(params: {
+  commentId: string;
+  markdown: string;
+}): Promise<{ replyId: string; identity: string }> {
+  const { identity } = getConfluenceConfig();
+  console.log(`[confluence] reply to comment ${params.commentId} as ${identity}`);
+
+  // Look up the parent comment's container (the page) so the reply attaches
+  // to the same page and nests under the comment.
+  const parent = await confluenceFetch(
+    `/rest/api/content/${params.commentId}?expand=container`,
+  );
+  if (!parent.ok) {
+    const err = await parent.text();
+    throw new Error(
+      `Confluence reply (fetch parent) failed: HTTP ${parent.status} — ${err.slice(0, 500)}`,
+    );
+  }
+  const parentComment = (await parent.json()) as {
+    container?: { id?: string; type?: string };
+  };
+  const containerId = parentComment.container?.id;
+  const containerType = parentComment.container?.type ?? 'page';
+
+  const html = await marked.parse(params.markdown, { gfm: true });
+
+  const requestBody: Record<string, unknown> = {
+    type: 'comment',
+    ancestors: [{ id: params.commentId }],
+    body: { storage: { value: html, representation: 'storage' } },
+  };
+  if (containerId) {
+    requestBody.container = { id: containerId, type: containerType };
+  }
+
+  const resp = await confluenceFetch('/rest/api/content', {
+    method: 'POST',
+    jsonBody: requestBody,
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Confluence reply failed: HTTP ${resp.status} — ${err.slice(0, 500)}`);
+  }
+  const reply = (await resp.json()) as { id: string };
+  return { replyId: reply.id, identity };
+}
