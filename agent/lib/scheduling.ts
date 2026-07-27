@@ -146,45 +146,69 @@ export interface FindNextSlotOptions extends ValidateSlotOptions {
   maxLookaheadDays?: number;
 }
 
-interface CandidatePhase {
-  weekdays: number[]; // which weekday integers to try (Sun=0, Mon=1, ...)
-  windowDays: number;
-}
-
 /**
- * Find the next N available slots per the Tue/Thu-first priority rules.
+ * Find the next N available slots, mirroring the blog-wordpress-scheduler skill
+ * (references/wp-find-slot.py) priority rules exactly:
  *
- * Phase 1: Tue, Thu within 14 days.
- * Phase 2: Wed, Mon within 14 days.
- * Phase 3: any Mon–Thu beyond 14 days, up to maxLookaheadDays.
+ *   Phase 1: Tue/Thu within the next 2 weeks (chronological).
+ *   Phase 2: Mon/Wed within the next 2 weeks — ONLY when no Tue/Thu slot is
+ *            open anywhere in that window (i.e. every Tue/Thu is booked/holiday).
+ *   Phase 3: beyond 2 weeks — scanned week by week, trying weekdays in priority
+ *            order [Tue, Thu, Wed, Mon] within each week.
+ *
+ * Tue/Thu are always preferred. When Phase 1 finds some (but fewer than
+ * `count`) slots, we top up from Phase 3 — which is itself Tue/Thu-first —
+ * rather than padding with nearby Mon/Wed. Mon/Wed inside the 2-week window are
+ * only ever offered when that window has no open Tue/Thu at all.
  */
+const WINDOW_DAYS = 14;
+
 export function findOpenSlots(opts: FindNextSlotOptions): string[] {
   const startYmd = opts.afterYmd ?? toYMD(addDays(new Date(), 1));
   const startDate = ymdToDate(startYmd);
   const count = opts.count ?? 1;
   const maxDays = opts.maxLookaheadDays ?? 60;
 
-  const phases: CandidatePhase[] = [
-    { weekdays: [2, 4], windowDays: 14 }, // Tue + Thu
-    { weekdays: [3, 1], windowDays: 14 }, // Wed + Mon
-    { weekdays: [1, 2, 3, 4], windowDays: maxDays }, // fallback: any Mon–Thu
-  ];
-
   const found: string[] = [];
   const seen = new Set<string>();
 
-  for (const phase of phases) {
-    for (let offset = 0; offset <= phase.windowDays && found.length < count; offset++) {
-      const day = addDays(startDate, offset);
-      const weekday = day.getUTCDay();
-      if (!phase.weekdays.includes(weekday)) continue;
-      const ymd = toYMD(day);
-      if (seen.has(ymd)) continue;
-      if (validateSlot(ymd, opts) !== null) continue;
-      found.push(ymd);
-      seen.add(ymd);
-    }
-    if (found.length >= count) break;
+  const tryPush = (ymd: string): void => {
+    if (found.length >= count) return;
+    if (seen.has(ymd)) return;
+    if (validateSlot(ymd, opts) !== null) return;
+    found.push(ymd);
+    seen.add(ymd);
+  };
+
+  // Phase 1 — Tue/Thu within the 2-week window (chronological).
+  for (let offset = 0; offset < WINDOW_DAYS && found.length < count; offset++) {
+    const day = addDays(startDate, offset);
+    if (day.getUTCDay() === 2 || day.getUTCDay() === 4) tryPush(toYMD(day));
   }
+
+  // Phase 2 — Mon/Wed within the 2-week window, only if NO Tue/Thu was open.
+  if (found.length === 0) {
+    for (let offset = 0; offset < WINDOW_DAYS && found.length < count; offset++) {
+      const day = addDays(startDate, offset);
+      if (day.getUTCDay() === 1 || day.getUTCDay() === 3) tryPush(toYMD(day));
+    }
+  }
+
+  // Phase 3 — beyond 2 weeks: week by week, priority order [Tue, Thu, Wed, Mon].
+  if (found.length < count) {
+    const PRIORITY = [2, 4, 3, 1]; // Tue, Thu, Wed, Mon (JS weekday indices)
+    const beyondStart = addDays(startDate, WINDOW_DAYS);
+    // Snap back to the Monday of that week so we scan whole weeks in priority order.
+    const weekStart = addDays(beyondStart, -((beyondStart.getUTCDay() + 6) % 7));
+    for (let dayOffset = 0; dayOffset <= maxDays && found.length < count; dayOffset += 7) {
+      const monday = addDays(weekStart, dayOffset);
+      for (const weekday of PRIORITY) {
+        const day = addDays(monday, weekday - 1); // Mon=1 → +0, Thu=4 → +3
+        if (day.getTime() < beyondStart.getTime()) continue; // stay outside the 2-week window
+        tryPush(toYMD(day));
+      }
+    }
+  }
+
   return found;
 }

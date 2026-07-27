@@ -47,11 +47,12 @@ export interface ResolvedTag {
 
 /**
  * For each tag name: find a case-insensitive exact match in WP, otherwise create it.
- * Returns the resolved tag IDs in the same order. Tags are limited to 5 to keep posts focused.
+ * Returns the resolved tag IDs in the same order. Tags are limited to 3 to keep
+ * posts focused, matching the blog-wordpress-stage skill ("choose 3 tags").
  */
 export async function findOrCreateTags(tagNames: string[]): Promise<ResolvedTag[]> {
   const resolved: ResolvedTag[] = [];
-  for (const name of tagNames.slice(0, 5)) {
+  for (const name of tagNames.slice(0, 3)) {
     const searchResp = await wpFetch(`/tags?search=${encodeURIComponent(name)}&per_page=5`);
     if (!searchResp.ok) {
       throw new Error(`Tag lookup failed for "${name}": HTTP ${searchResp.status}`);
@@ -155,19 +156,33 @@ export async function findPostByExactTitle(title: string): Promise<ExistingPost 
 }
 
 /**
- * Look up a WordPress user ID by display name or login slug.
- * Returns null if no match found — caller decides whether to error or proceed without author.
+ * Look up a WordPress user by display name or login slug.
+ *
+ * Uses the default `context=view`, which any authenticated account can call —
+ * NOT `context=edit`, which needs the `list_users` capability (admin/editor
+ * only). Using `edit` here meant a lower-privilege service account silently got
+ * a 403 and no author was ever set. See the header note on capabilities.
+ *
+ * Returns an exact (case-insensitive) name/slug match, or the sole result when
+ * the search is unambiguous. Returns null when there's no match or the result
+ * is ambiguous (multiple non-exact hits) — better to warn than misattribute.
+ * Throws on an HTTP error so the caller can surface a permission problem.
  */
 export async function findWpUserByName(name: string): Promise<{ id: number; name: string; slug: string } | null> {
-  const resp = await wpFetch(`/users?search=${encodeURIComponent(name)}&per_page=10&context=edit`);
-  if (!resp.ok) return null;
+  const resp = await wpFetch(`/users?search=${encodeURIComponent(name)}&per_page=10`);
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`User lookup for "${name}" failed: HTTP ${resp.status} — ${err}`);
+  }
   const users = (await resp.json()) as Array<{ id: number; name: string; slug: string }>;
   if (users.length === 0) return null;
   const needle = name.trim().toLowerCase();
-  return (
-    users.find((u) => u.name.toLowerCase() === needle || u.slug.toLowerCase() === needle) ??
-    users[0]
+  const exact = users.find(
+    (u) => u.name.toLowerCase() === needle || u.slug.toLowerCase() === needle,
   );
+  if (exact) return exact;
+  // No exact match: accept a single result, else bail rather than guess.
+  return users.length === 1 ? users[0] : null;
 }
 
 export interface CreateOrUpdatePostParams {
@@ -186,6 +201,7 @@ export interface CreatedOrUpdatedPost {
   status: string;
   link: string;
   editLink: string;
+  authorId: number; // the author WordPress actually saved (may differ from requested)
 }
 
 /**
@@ -205,26 +221,32 @@ export interface WpPost {
   id: number;
   title: string;
   status: string;
-  ymd: string; // YYYY-MM-DD (in WP's local timezone — PT for blog.postman.com)
+  ymd: string; // YYYY-MM-DD creation date (in WP's local timezone — PT for blog.postman.com)
+  modifiedYmd: string; // YYYY-MM-DD last-modified date (PT)
   isoDate: string;
   link: string;
 }
 
 /**
  * Fetch posts of a given status with optional date-range filter. Paginates
- * automatically. `afterYmd` / `beforeYmd` are inclusive day boundaries.
+ * automatically. `afterYmd` / `beforeYmd` are inclusive day boundaries filtered
+ * on the post's creation date (site-local PT), matching the blog-wordpress-*
+ * skills. `orderBy` controls the sort field — use 'modified' for drafts so the
+ * most recently touched ones come first.
  */
 export async function getPostsByStatus(opts: {
   status: 'publish' | 'future' | 'draft' | 'pending';
   afterYmd?: string;
   beforeYmd?: string;
   order?: 'asc' | 'desc';
+  orderBy?: 'date' | 'modified';
 }): Promise<WpPost[]> {
   const order = opts.order ?? 'asc';
+  const orderBy = opts.orderBy ?? 'date';
   const query: string[] = [
     `status=${opts.status}`,
     `per_page=100`,
-    `orderby=date`,
+    `orderby=${orderBy}`,
     `order=${order}`,
   ];
   if (opts.afterYmd) query.push(`after=${opts.afterYmd}T00:00:00`);
@@ -242,6 +264,7 @@ export async function getPostsByStatus(opts: {
       title: { rendered: string };
       status: string;
       date: string;
+      modified: string;
       link: string;
     }>;
     for (const p of posts) {
@@ -250,6 +273,7 @@ export async function getPostsByStatus(opts: {
         title: decodeHtmlEntities(p.title?.rendered ?? ''),
         status: p.status,
         ymd: (p.date ?? '').slice(0, 10),
+        modifiedYmd: (p.modified ?? p.date ?? '').slice(0, 10),
         isoDate: p.date,
         link: p.link,
       });
@@ -297,9 +321,10 @@ export async function getScheduledPosts(): Promise<ScheduledPost[]> {
   return all;
 }
 
-// NOTE: schedulePost() was intentionally removed — Quill is staging-only and
-// must not flip posts to status=future. Scheduling is a human editor action
-// done in the WP admin panel.
+// NOTE: Quill is staging-only for WordPress — it creates drafts (status=draft)
+// but never schedules (status=future) or publishes (status=publish). Scheduling
+// and publishing are human editor actions done in the WP admin panel. (An
+// earlier schedulePost() was removed per the locked editorial policy.)
 
 export async function createOrUpdatePost(
   params: CreateOrUpdatePostParams,
@@ -331,6 +356,7 @@ export async function createOrUpdatePost(
     title: { rendered: string };
     status: string;
     link: string;
+    author: number;
   };
   return {
     id: post.id,
@@ -338,5 +364,6 @@ export async function createOrUpdatePost(
     status: post.status,
     link: post.link,
     editLink: `https://blog.postman.com/wp-admin/post.php?post=${post.id}&action=edit`,
+    authorId: post.author,
   };
 }

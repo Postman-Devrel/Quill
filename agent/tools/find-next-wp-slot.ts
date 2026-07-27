@@ -6,7 +6,7 @@ import { getScheduledPosts } from '../lib/wordpress.js';
 export const findNextWpSlotTool = createTool({
   id: 'find_next_wp_slot',
   description:
-    'Find the next available publish slot(s) for blog.postman.com per the editorial rules: 8am PST, Tue/Thu first within 2 weeks, then Wed/Mon, never Fri/Sat/Sun, no US holidays, no same-day conflicts with existing scheduled posts. Returns up to N open slots in YYYY-MM-DD form. Use this before reschedule_wp_post when the user asks "when can this go live?" or wants options.',
+    'Suggest the next available publish slot(s) for blog.postman.com per the editorial rules: 8am PST, Tue/Thu first within 2 weeks; Mon/Wed only when every Tue/Thu in that window is booked; beyond 2 weeks it scans week by week in [Tue, Thu, Wed, Mon] priority; never Fri/Sat/Sun, no US holidays, no same-day conflicts with existing scheduled posts. Returns up to N open slots in YYYY-MM-DD form. INFORMATIONAL ONLY — use this when the user asks "when could this go live?" or wants to see which dates fit. Quill cannot schedule or publish; a human editor sets the date in the WP admin panel after review.',
   inputSchema: z.object({
     count: z
       .number()

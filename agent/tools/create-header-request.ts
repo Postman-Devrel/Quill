@@ -20,11 +20,19 @@ export const createHeaderRequestTool = createTool({
     issueType: z
       .string()
       .optional()
-      .describe('Jira issue type. Defaults to JIRA_HEADER_ISSUE_TYPE env var, or "Task" if unset.'),
+      .describe('Jira issue type (Work Type). Defaults to JIRA_HEADER_ISSUE_TYPE env var, or "Blog content" if unset.'),
+    status: z
+      .string()
+      .optional()
+      .describe('Status to move the ticket to right after creation. Defaults to JIRA_INITIAL_STATUS env var, or "In Progress" if unset.'),
     marketingTeam: z
       .string()
       .optional()
-      .describe('Marketing Team option (MKTG required field). Defaults to JIRA_MARKETING_TEAM env var, or "Creative" if unset.'),
+      .describe('Marketing Team option (MKTG required field). Defaults to JIRA_MARKETING_TEAM env var, or "DevRel" if unset.'),
+    parentKey: z
+      .string()
+      .optional()
+      .describe('Parent epic key the ticket is nested under so it shows on the DevRel board. Defaults to JIRA_PARENT_EPIC_KEY env var, or "MKTG-8442" (Technical Content) if unset.'),
     author: z
       .string()
       .describe('Full name of the blog post author (e.g. "Jane Smith"). ALWAYS ask the user "Who is the author of this post?" before calling this tool if the author is not already known from context.'),
@@ -41,7 +49,7 @@ export const createHeaderRequestTool = createTool({
       .optional()
       .describe('Due date for the header image in YYYY-MM-DD format. Ask the user before calling if not already provided.'),
   }),
-  execute: async ({ blogTitle, confluenceUrl, projectKey, issueType, marketingTeam, author, requesterEmail, assigneeEmail, dueDate }) => {
+  execute: async ({ blogTitle, confluenceUrl, projectKey, issueType, marketingTeam, parentKey, status, author, requesterEmail, assigneeEmail, dueDate }) => {
     const t0 = Date.now();
     console.log(`[create_header_request] start: title=${JSON.stringify(blogTitle)}, author=${JSON.stringify(author)}, requesterEmail=${JSON.stringify(requesterEmail ?? null)}, assigneeEmail=${JSON.stringify(assigneeEmail ?? null)}`);
     try {
@@ -51,6 +59,8 @@ export const createHeaderRequestTool = createTool({
         projectKey,
         issueType,
         marketingTeam,
+        parentKey,
+        status,
         author,
         requesterEmail,
         assigneeEmail,
@@ -71,6 +81,9 @@ export const createHeaderRequestTool = createTool({
         requesterDisplayName: result.requesterDisplayName,
         assigneeSet: result.assigneeSet,
         assigneeDisplayName: result.assigneeDisplayName,
+        parentKey: result.parentKey,
+        statusSet: result.statusSet,
+        status: result.status,
       };
     } catch (e) {
       console.log(

@@ -47,6 +47,28 @@ export async function markdownToHtml(body: string): Promise<string> {
 }
 
 /**
+ * Remove a single leading H1 (the title line, `# ...`) from a markdown body.
+ *
+ * Draft bodies from write_draft/copyedit_draft open with `# {title}`, but
+ * WordPress renders the post title from its own `title` field — leaving the H1
+ * in the body duplicates the title on the published page. Only strips an H1 at
+ * the very top (before any other content); H2+ and any later `#` headings are
+ * left untouched.
+ */
+export function stripLeadingH1(body: string): string {
+  const lines = body.split('\n');
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') i++; // skip leading blank lines
+  // A single `#` followed by whitespace = H1 (`## ` etc. won't match).
+  if (i < lines.length && /^#\s+\S/.test(lines[i])) {
+    lines.splice(0, i + 1); // drop blanks + the H1 line
+    while (lines.length && lines[0].trim() === '') lines.shift(); // drop trailing blanks
+    return lines.join('\n');
+  }
+  return body;
+}
+
+/**
  * Pull a string-typed frontmatter field, with a fallback.
  */
 export function frontmatterString(
@@ -56,6 +78,22 @@ export function frontmatterString(
 ): string {
   const v = fm[key];
   return typeof v === 'string' ? v : fallback;
+}
+
+/**
+ * Pull a number-typed frontmatter field (e.g. `wordpress_id`). Accepts a real
+ * number or a numeric string. Returns undefined when absent or unparseable.
+ */
+export function frontmatterNumber(
+  fm: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const v = fm[key];
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) {
+    return Number(v);
+  }
+  return undefined;
 }
 
 /**

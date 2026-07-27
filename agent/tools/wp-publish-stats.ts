@@ -38,6 +38,11 @@ export const wpPublishStatsTool = createTool({
     if (startDate > endDate) {
       return { error: `startDate ${startDate} is after endDate ${endDate}.` };
     }
+    const now = new Date();
+    const todayYmd = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+    if (startDate > todayYmd) {
+      return { error: `startDate ${startDate} is in the future (today is ${todayYmd}). Publish stats only cover dates up to today.` };
+    }
 
     try {
       const posts = await getPostsByStatus({

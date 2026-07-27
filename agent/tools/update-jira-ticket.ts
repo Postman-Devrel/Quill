@@ -5,11 +5,15 @@ import { updateJiraIssue } from '../lib/jira.js';
 export const updateJiraTicketTool = createTool({
   id: 'update_jira_ticket',
   description:
-    'Edit an existing Jira ticket — update the author, summary, Confluence draft link, due date, assignee, labels, or add a comment. Use this when the user asks to fix, update, or change anything on a ticket they already have (e.g. "update MKTG-10629 with Sam Chehab as the author"). Always confirm the issue key before calling.',
+    'Edit an existing Jira ticket — update the author, summary, Confluence draft link, due date, assignee, labels, add a comment, or move it to a new status (e.g. "In Progress", "In Review"). Use this when the user asks to fix, update, change, or move a ticket they already have (e.g. "update MKTG-10629 with Sam Chehab as the author", or "move MKTG-10629 to In Review"). Always confirm the issue key before calling.',
   inputSchema: z.object({
     issueKey: z
       .string()
       .describe('The Jira issue key to update, e.g. "MKTG-10629".'),
+    status: z
+      .string()
+      .optional()
+      .describe('Move the ticket to this status by name, e.g. "In Progress" or "In Review". Best-effort — transitions available from the current status only.'),
     summary: z
       .string()
       .optional()
@@ -26,10 +30,18 @@ export const updateJiraTicketTool = createTool({
       .string()
       .optional()
       .describe('New due date in YYYY-MM-DD format.'),
+    assigneeEmail: z
+      .string()
+      .optional()
+      .describe('Email of the person to assign the ticket to (most reliable match). Use this for "assign this to jane@postman.com".'),
+    assigneeName: z
+      .string()
+      .optional()
+      .describe('Full name of the person to assign the ticket to, e.g. "Jane Smith". Used if no email is given. Resolved to a Jira account by name.'),
     assigneeAccountId: z
       .string()
       .optional()
-      .describe('Atlassian account ID of the new assignee.'),
+      .describe('Atlassian account ID of the new assignee (if you already have it).'),
     labels: z
       .array(z.string())
       .optional()
@@ -39,26 +51,32 @@ export const updateJiraTicketTool = createTool({
       .optional()
       .describe('A comment to add to the ticket (plain text).'),
   }),
-  execute: async ({ issueKey, summary, author, confluenceUrl, dueDate, assigneeAccountId, labels, comment }) => {
+  execute: async ({ issueKey, status, summary, author, confluenceUrl, dueDate, assigneeEmail, assigneeName, assigneeAccountId, labels, comment }) => {
     const t0 = Date.now();
-    console.log(`[update_jira_ticket] start: key=${issueKey}`);
+    const assigneeRequested = Boolean(assigneeEmail || assigneeName || assigneeAccountId);
+    console.log(`[update_jira_ticket] start: key=${issueKey}${status ? ` status=${status}` : ''}${assigneeRequested ? ' assignee=?' : ''}`);
     try {
       const result = await updateJiraIssue({
         issueKey,
+        status,
         summary,
         author,
         confluenceUrl,
         dueDate,
+        assigneeEmail,
+        assigneeName,
         assigneeAccountId,
         labels,
         comment,
       });
-      console.log(`[update_jira_ticket] done in ${Date.now() - t0}ms (key=${result.key})`);
+      console.log(`[update_jira_ticket] done in ${Date.now() - t0}ms (key=${result.key}${status ? ` statusSet=${result.statusSet}` : ''}${assigneeRequested ? ` assigneeSet=${result.assigneeSet}` : ''})`);
       return {
         success: true,
         ticketKey: result.key,
         ticketUrl: result.ticketUrl,
         identity: result.identity,
+        ...(status ? { statusSet: result.statusSet, status: result.status } : {}),
+        ...(assigneeRequested ? { assigneeSet: result.assigneeSet, assigneeDisplayName: result.assigneeDisplayName } : {}),
       };
     } catch (e) {
       console.log(

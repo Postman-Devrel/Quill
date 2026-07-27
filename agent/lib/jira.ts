@@ -154,6 +154,66 @@ async function addWatcher(issueKey: string, accountId: string): Promise<boolean>
   }
 }
 
+// Move an issue to a target status by name (case-insensitive), matching on the
+// destination status first, then the transition label. Status can't be set at
+// create time, so this runs right after creation. Best-effort — returns the
+// resolved status name on success, or null if no matching transition is
+// available or the call fails (never throws / never fails the create).
+async function transitionIssueToStatus(
+  issueKey: string,
+  statusName: string,
+): Promise<string | null> {
+  try {
+    const listResp = await jiraFetch(`/rest/api/3/issue/${issueKey}/transitions`);
+    if (!listResp.ok) {
+      console.log(`[jira] list transitions for ${issueKey} failed: HTTP ${listResp.status}`);
+      return null;
+    }
+    const { transitions } = (await listResp.json()) as {
+      transitions: Array<{ id: string; name: string; to?: { name?: string } }>;
+    };
+    const target = statusName.trim().toLowerCase();
+    const match =
+      transitions.find((t) => t.to?.name?.toLowerCase() === target) ??
+      transitions.find((t) => t.name?.toLowerCase() === target);
+    if (!match) {
+      console.log(
+        `[jira] no "${statusName}" transition for ${issueKey} (available: ${transitions.map((t) => t.to?.name ?? t.name).join(', ')})`,
+      );
+      return null;
+    }
+    const doResp = await jiraFetch(`/rest/api/3/issue/${issueKey}/transitions`, {
+      method: 'POST',
+      jsonBody: { transition: { id: match.id } },
+    });
+    if (!doResp.ok) {
+      console.log(`[jira] transition ${issueKey} → ${statusName} failed: HTTP ${doResp.status}`);
+      return null;
+    }
+    return match.to?.name ?? statusName;
+  } catch (e) {
+    console.log(`[jira] transition error: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
+
+// Public wrapper around the transition helper — move an issue to a status by
+// name and return a small result. Used by the WordPress staging flow to flip
+// the linked blog ticket to "In Review" when a draft is staged.
+export async function moveJiraIssueToStatus(
+  issueKey: string,
+  statusName: string,
+): Promise<{ key: string; status: string | null; moved: boolean; ticketUrl: string }> {
+  const { baseUrl } = getJiraConfig();
+  const resolved = await transitionIssueToStatus(issueKey, statusName);
+  return {
+    key: issueKey,
+    status: resolved,
+    moved: Boolean(resolved),
+    ticketUrl: `${baseUrl}/browse/${issueKey}`,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Create issue
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,6 +237,13 @@ export interface CreateHeaderRequestParams {
   assigneeName?: string;
   labels?: string[];
   marketingTeam?: string;
+  // Parent epic the ticket is nested under. Defaults to MKTG-8442
+  // ("Technical Content"), the DevRel epic — parenting the ticket to it makes it
+  // roll up onto the DevRel board. Override via JIRA_PARENT_EPIC_KEY.
+  parentKey?: string;
+  // Status to move the ticket to right after creation. Defaults to "In Progress".
+  // Override via JIRA_INITIAL_STATUS.
+  status?: string;
   dueDate?: string;
 }
 
@@ -194,6 +261,13 @@ export interface CreatedJiraIssue {
   // Set when an assignee was resolved and applied to the ticket.
   assigneeSet: boolean;
   assigneeDisplayName?: string;
+  // The parent epic the ticket was nested under (e.g. MKTG-8442).
+  parentKey: string;
+  // Whether the post-create status transition succeeded, and the resulting
+  // status name (e.g. "In Progress"). statusSet is false if the transition
+  // wasn't available — the ticket then sits in the workflow's initial status.
+  statusSet: boolean;
+  status?: string;
 }
 
 export async function createHeaderRequestIssue(
@@ -203,12 +277,17 @@ export async function createHeaderRequestIssue(
   const projectKey =
     params.projectKey ?? process.env.JIRA_PROJECT_KEY ?? 'MKTG';
   const issueType =
-    params.issueType ?? process.env.JIRA_HEADER_ISSUE_TYPE ?? 'Task';
-  const labels = params.labels ?? ['blog', 'quill', 'header-image'];
+    params.issueType ?? process.env.JIRA_HEADER_ISSUE_TYPE ?? 'Blog content';
+  const labels = params.labels ?? ['blog', 'quill'];
   const marketingTeam =
-    params.marketingTeam ?? process.env.JIRA_MARKETING_TEAM ?? 'Creative';
+    params.marketingTeam ?? process.env.JIRA_MARKETING_TEAM ?? 'DevRel';
+  const parentKey =
+    params.parentKey ?? process.env.JIRA_PARENT_EPIC_KEY ?? 'MKTG-8442';
+  const targetStatus =
+    params.status ?? process.env.JIRA_INITIAL_STATUS ?? 'In Progress';
 
-  const summary = `Header image request for blog: ${params.blogTitle}`;
+  // The ticket summary is just the blog title.
+  const summary = params.blogTitle;
 
   const authorParagraph = params.author
     ? adfParagraph(adfBold('Author: '), adfText(params.author))
@@ -229,7 +308,7 @@ export async function createHeaderRequestIssue(
       : null;
 
   const descParagraphs: AdfNode[] = [
-    adfParagraph(adfText('Header image request for blog: '), adfBold(params.blogTitle)),
+    adfParagraph(adfText('Blog: '), adfBold(params.blogTitle)),
     authorParagraph,
   ];
   if (requesterParagraph) descParagraphs.push(requesterParagraph);
@@ -248,10 +327,6 @@ export async function createHeaderRequestIssue(
 
   descParagraphs.push(
     adfParagraph(adfText('Confluence draft: '), adfLink(params.confluenceUrl, params.confluenceUrl)),
-    adfParagraph(
-      adfBold('Please note: '),
-      adfText('This is a feature request. Please attach the final header image to this ticket when ready.'),
-    ),
     adfParagraph(adfText('This ticket was created automatically by Quill 🪶.')),
   );
   const description = adfDoc(...descParagraphs);
@@ -262,9 +337,12 @@ export async function createHeaderRequestIssue(
     description,
     issuetype: { name: issueType },
     labels,
+    // Parent epic (MKTG-8442 "Technical Content" by default) so header requests
+    // roll up onto the DevRel board.
+    parent: { key: parentKey },
     // customfield_13620 = "Marketing Team" — required by the MKTG project.
     // Set via JIRA_MARKETING_TEAM env var or the marketingTeam param; defaults
-    // to "Creative" (the team that owns blog header design).
+    // to "DevRel" (the team that owns the blog).
     customfield_13620: { value: marketingTeam },
   };
   if (resolvedAssignee) {
@@ -294,6 +372,11 @@ export async function createHeaderRequestIssue(
     requesterTagged = await addWatcher(created.key, requester.accountId);
   }
 
+  // Move the freshly-created ticket to its target status (default "In Progress").
+  // Best-effort: a failed transition leaves the ticket in the workflow's initial
+  // status but never fails the create.
+  const resolvedStatus = await transitionIssueToStatus(created.key, targetStatus);
+
   return {
     key: created.key,
     id: created.id,
@@ -306,6 +389,9 @@ export async function createHeaderRequestIssue(
     requesterDisplayName: requester?.displayName,
     assigneeSet: Boolean(resolvedAssignee),
     assigneeDisplayName: resolvedAssignee?.displayName,
+    parentKey,
+    statusSet: Boolean(resolvedStatus),
+    status: resolvedStatus ?? undefined,
   };
 }
 
@@ -319,15 +405,26 @@ export interface UpdateJiraIssueParams {
   author?: string;
   confluenceUrl?: string;
   dueDate?: string;
+  // Assignee resolution order: explicit accountId, then email, then name.
   assigneeAccountId?: string;
+  assigneeEmail?: string;
+  assigneeName?: string;
   labels?: string[];
   comment?: string;
+  // Move the ticket to this status (by name, e.g. "In Review"). Best-effort.
+  status?: string;
 }
 
 export interface UpdatedJiraIssue {
   key: string;
   ticketUrl: string;
   identity: string;
+  // Present only when a status transition was requested.
+  statusSet?: boolean;
+  status?: string;
+  // Present only when an assignee was requested.
+  assigneeSet?: boolean;
+  assigneeDisplayName?: string;
 }
 
 export async function updateJiraIssue(params: UpdateJiraIssueParams): Promise<UpdatedJiraIssue> {
@@ -337,8 +434,22 @@ export async function updateJiraIssue(params: UpdateJiraIssueParams): Promise<Up
   const fields: Record<string, unknown> = {};
   if (params.summary) fields.summary = params.summary;
   if (params.dueDate) fields.duedate = params.dueDate;
-  if (params.assigneeAccountId) fields.assignee = { accountId: params.assigneeAccountId };
   if (params.labels) fields.labels = params.labels;
+
+  // Resolve the assignee: explicit accountId wins, else look up by email/name.
+  const assigneeRequested = Boolean(
+    params.assigneeAccountId || params.assigneeEmail || params.assigneeName,
+  );
+  let resolvedAssignee: JiraUser | null = null;
+  if (params.assigneeAccountId) {
+    fields.assignee = { accountId: params.assigneeAccountId };
+    resolvedAssignee = { accountId: params.assigneeAccountId, displayName: '' };
+  } else if (params.assigneeEmail || params.assigneeName) {
+    resolvedAssignee = await findJiraAccountId(
+      (params.assigneeEmail ?? params.assigneeName) as string,
+    );
+    if (resolvedAssignee) fields.assignee = { accountId: resolvedAssignee.accountId };
+  }
 
   if (params.author !== undefined || params.confluenceUrl !== undefined) {
     const currentResp = await jiraFetch(
@@ -352,12 +463,14 @@ export async function updateJiraIssue(params: UpdateJiraIssueParams): Promise<Up
       fields: { summary?: string; description?: unknown };
     };
 
+    // Tolerate the legacy "Header image request for blog:" prefix on older
+    // tickets when deriving the blog title from the current summary.
     const blogTitle = params.summary ?? (current.fields.summary ?? '').replace(/^Header image request for blog:\s*/, '');
     const author = params.author ?? 'Unknown';
     const confluenceUrl = params.confluenceUrl ?? '';
 
     const descParagraphs: AdfNode[] = [
-      adfParagraph(adfText('Header image request for blog: '), adfBold(blogTitle)),
+      adfParagraph(adfText('Blog: '), adfBold(blogTitle)),
       adfParagraph(adfBold('Author: '), adfText(author)),
     ];
     if (confluenceUrl) {
@@ -366,10 +479,6 @@ export async function updateJiraIssue(params: UpdateJiraIssueParams): Promise<Up
       );
     }
     descParagraphs.push(
-      adfParagraph(
-        adfBold('Please note: '),
-        adfText('This is a feature request. Please attach the final header image to this ticket when ready.'),
-      ),
       adfParagraph(adfText('This ticket was created automatically by Quill 🪶.')),
     );
     fields.description = adfDoc(...descParagraphs);
@@ -399,9 +508,21 @@ export async function updateJiraIssue(params: UpdateJiraIssueParams): Promise<Up
     }
   }
 
+  let resolvedStatus: string | null = null;
+  if (params.status) {
+    resolvedStatus = await transitionIssueToStatus(params.issueKey, params.status);
+  }
+
   return {
     key: params.issueKey,
     ticketUrl: `${baseUrl}/browse/${params.issueKey}`,
     identity,
+    ...(params.status ? { statusSet: Boolean(resolvedStatus), status: resolvedStatus ?? undefined } : {}),
+    ...(assigneeRequested
+      ? {
+          assigneeSet: Boolean(fields.assignee),
+          assigneeDisplayName: resolvedAssignee?.displayName || undefined,
+        }
+      : {}),
   };
 }

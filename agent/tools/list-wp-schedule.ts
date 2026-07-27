@@ -70,16 +70,29 @@ export const listWpScheduleTool = createTool({
   },
 });
 
+// The blog-wordpress-scheduler "list" view has three sections with these windows.
+const RECENTLY_PUBLISHED_DAYS = 180; // past 6 months
+const RECENT_DRAFTS_DAYS = 21; // past 3 weeks
+const RECENTLY_PUBLISHED_RETURN_CAP = 15; // keep the payload Slack-friendly
+
 async function buildUpcomingView(weeks: number) {
   const today = new Date();
   const endYmd = toYMD(addDays(today, weeks * 7));
+  const publishedAfterYmd = toYMD(addDays(today, -RECENTLY_PUBLISHED_DAYS));
+  const draftsAfterYmd = toYMD(addDays(today, -RECENT_DRAFTS_DAYS));
 
-  const scheduled = await getScheduledPosts();
+  const [scheduled, published, drafts] = await Promise.all([
+    getScheduledPosts(),
+    getPostsByStatus({ status: 'publish', afterYmd: publishedAfterYmd, order: 'desc' }),
+    getPostsByStatus({
+      status: 'draft',
+      afterYmd: draftsAfterYmd,
+      orderBy: 'modified',
+      order: 'desc',
+    }),
+  ]);
+
   const inWindow = scheduled.filter((p) => p.ymd <= endYmd);
-
-  const recentDrafts = (
-    await getPostsByStatus({ status: 'draft', order: 'desc' })
-  ).slice(0, 10);
 
   const scheduledDates = new Set(scheduled.map((p) => p.ymd));
   const nextOpenSlots = findOpenSlots({ count: 3, scheduledDates });
@@ -94,10 +107,23 @@ async function buildUpcomingView(weeks: number) {
       dayOfWeek: dayNameFromYmd(p.ymd),
       previewUrl: p.link,
     })),
-    recentDrafts: recentDrafts.map((p) => ({
+    recentlyPublished: {
+      window: 'past 6 months',
+      total: published.length,
+      posts: published.slice(0, RECENTLY_PUBLISHED_RETURN_CAP).map((p) => ({
+        id: p.id,
+        title: p.title,
+        ymd: p.ymd,
+        dayOfWeek: dayNameFromYmd(p.ymd),
+        link: p.link,
+      })),
+    },
+    recentDrafts: drafts.map((p) => ({
       id: p.id,
       title: p.title,
       ymd: p.ymd,
+      modifiedYmd: p.modifiedYmd,
+      dayOfWeek: dayNameFromYmd(p.modifiedYmd),
     })),
     nextOpenSlots: nextOpenSlots.map((ymd) => ({
       ymd,
@@ -178,7 +204,8 @@ async function buildSummaryView(year: number) {
   const [published, scheduled, drafts] = await Promise.all([
     getPostsByStatus({ status: 'publish', afterYmd: startYmd, beforeYmd: endYmd }),
     getPostsByStatus({ status: 'future', afterYmd: startYmd, beforeYmd: endYmd }),
-    getPostsByStatus({ status: 'draft' }),
+    // Drafts are bucketed by last-modified month, so fetch by modified date.
+    getPostsByStatus({ status: 'draft', afterYmd: startYmd, orderBy: 'modified', order: 'desc' }),
   ]);
 
   const now = new Date();
@@ -205,10 +232,11 @@ async function buildSummaryView(year: number) {
       if (m0 <= currentMonth0) months[m0].scheduled++;
     }
   }
-  // Drafts: bucket by creation month
+  // Drafts: bucket by last-modified month (matches blog-wordpress-scheduler summary)
   for (const p of drafts) {
-    if (yearFromYmd(p.ymd) === year) {
-      const m0 = monthNumberFromYmd(p.ymd) - 1;
+    const my = p.modifiedYmd || p.ymd;
+    if (yearFromYmd(my) === year) {
+      const m0 = monthNumberFromYmd(my) - 1;
       if (m0 <= currentMonth0) months[m0].draft++;
     }
   }
