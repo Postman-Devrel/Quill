@@ -167,7 +167,11 @@ One-time admin setup:
 
 ## Configuration
 
-Astropods auto-injects `ANTHROPIC_API_KEY` because `astropods.yml` declares `models.anthropic.provider: anthropic`. Set the rest via `ast project configure`:
+All model traffic goes through the [Astro AI gateway](https://docs.astropods.com/ai-gateway). Because `astropods.yml` declares `models.default` and `models.fast` with `provider: gateway`, Astropods auto-injects `ASTRO_GATEWAY_URL`, `ASTRO_GATEWAY_API_KEY`, `MODEL_DEFAULT`, and `MODEL_FAST` — no `ANTHROPIC_API_KEY` is needed or provided. Each block lists a menu of models; you pick one per block at deploy time.
+
+Quill uses both gateway endpoint families: the Mastra agent talks to the OpenAI-compatible `${ASTRO_GATEWAY_URL}/v1`, while the direct `@anthropic-ai/sdk` tool calls use the Anthropic-native passthrough at `${ASTRO_GATEWAY_URL}/anthropic` (which authenticates via the `x-bf-vk` header and needs `bedrock/`-prefixed model IDs).
+
+Set the rest via `ast project configure`:
 
 | Env var | Required? | Purpose |
 |---|:---:|---|
@@ -301,7 +305,7 @@ Quill/
 - **Runtime:** [Bun](https://bun.sh) 1.x
 - **Agent framework:** [Mastra](https://mastra.ai)
 - **Platform:** [Astropods](https://astropods.com) (`@astropods/adapter-core` + `@astropods/adapter-mastra`)
-- **LLM:** Anthropic Claude Sonnet (via `@anthropic-ai/sdk` — direct calls)
+- **LLM:** Claude via the [Astro AI gateway](https://docs.astropods.com/ai-gateway) — Mastra over the OpenAI-compatible endpoint, plus direct `@anthropic-ai/sdk` calls over the Anthropic passthrough
 - **Other:** `marked` (md → HTML), `turndown` (HTML → md), `yaml` (frontmatter), `zod` (tool schemas)
 
 ---

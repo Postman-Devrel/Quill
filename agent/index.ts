@@ -8,6 +8,7 @@ import { MastraAdapter } from '@astropods/adapter-mastra';
 import { serve } from '@astropods/adapter-core';
 
 import { QUILL_INSTRUCTIONS } from './instructions.js';
+import { defaultModelId, gatewayEnv } from './lib/gateway.js';
 import {
   webSearchTool,
   writeDraftTool,
@@ -38,6 +39,8 @@ function resolveOtlpEndpoint(): string {
   }
 }
 
+const gateway = gatewayEnv();
+
 const memory = new Memory({
   storage: new LibSQLStore({ id: 'quill-memory', url: ':memory:' }),
 });
@@ -64,7 +67,16 @@ const agent = new Agent({
   id: 'quill',
   name: 'Quill',
   instructions: () => QUILL_INSTRUCTIONS,
-  model: 'anthropic/claude-opus-4-7',
+  // Route through the Astro AI gateway's OpenAI-compatible endpoint rather
+  // than Mastra's model router — the router resolves `anthropic/<model>`
+  // against ANTHROPIC_API_KEY, which the platform no longer injects under
+  // `models.default.provider: gateway`.
+  model: {
+    providerId: 'astro-gateway',
+    modelId: defaultModelId(),
+    url: `${gateway.url}/v1`,
+    apiKey: gateway.key,
+  },
   memory,
   tools: {
     web_search: webSearchTool,

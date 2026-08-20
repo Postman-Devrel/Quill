@@ -42,9 +42,18 @@ agent:
 # should work with just the credential inputs above. Change the defaults
 # in code + redeploy if they need to move.
 
+# Astro AI gateway. Each entry is a menu — one model is picked per entry at
+# deploy time and injected as MODEL_<NAME>, alongside ASTRO_GATEWAY_URL and
+# ASTRO_GATEWAY_API_KEY. No ANTHROPIC_API_KEY is injected under the gateway.
 models:
-  anthropic:
-    provider: anthropic
+  # Conversation routing + write_draft/copyedit_draft, where quality matters.
+  default:
+    provider: gateway
+    models: [claude-opus-4-8, claude-sonnet-4-6]
+  # blog_ideas is pure scoring/ranking — cheap and fast is enough (see LEARNINGS.md).
+  fast:
+    provider: gateway
+    models: [claude-haiku-4-5, claude-sonnet-4-6]
 
 dev:
   interfaces:

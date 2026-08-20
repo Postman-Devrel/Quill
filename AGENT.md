@@ -65,7 +65,7 @@ State is intentionally minimal — Mastra's in-memory store carries the active c
 
 ## Configuration
 
-`ANTHROPIC_API_KEY` is auto-injected by Astropods. Set the rest via `ast project configure`:
+Model access goes through the [Astro AI gateway](https://docs.astropods.com/ai-gateway). Because `astropods.yml` declares `models.default` and `models.fast` with `provider: gateway`, Astropods auto-injects `ASTRO_GATEWAY_URL`, `ASTRO_GATEWAY_API_KEY`, `MODEL_DEFAULT`, and `MODEL_FAST` — there is no `ANTHROPIC_API_KEY`. Pick the model for each block at deploy time. Set the rest via `ast project configure`:
 
 | Env var | Required | Purpose |
 |---|---|---|

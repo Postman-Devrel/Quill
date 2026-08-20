@@ -1,14 +1,21 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { bedrockModelId, defaultModelId, gatewayEnv } from './gateway.js';
 
 let client: Anthropic | null = null;
 
 export function getAnthropicClient(): Anthropic {
   if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is not set. Run: ast project configure');
-    }
-    client = new Anthropic({ apiKey });
+    const { url, key } = gatewayEnv();
+    client = new Anthropic({
+      // The gateway's Anthropic-native passthrough; the SDK appends
+      // /v1/messages itself.
+      baseURL: `${url}/anthropic`,
+      // The gateway reads its virtual key from x-bf-vk and ignores the
+      // standard auth headers, so the key has to go in both places — apiKey
+      // to satisfy the SDK's own required-credential check.
+      apiKey: key,
+      defaultHeaders: { 'x-bf-vk': key },
+    });
   }
   return client;
 }
@@ -28,10 +35,14 @@ export interface GenerateOptions {
 export async function generateText(opts: GenerateOptions): Promise<string> {
   const anthropic = getAnthropicClient();
   const response = await anthropic.messages.create({
-    model: opts.model ?? 'claude-opus-4-7',
+    // Callers pass a bare gateway model ID (or nothing, for the quality path);
+    // the passthrough needs it bedrock-prefixed.
+    model: bedrockModelId(opts.model ?? defaultModelId()),
     max_tokens: opts.maxTokens ?? 8000,
-    // Cache the system prompt at Anthropic — large SKILL.md prompts hit cache
-    // after the first call, cutting TTFT significantly on repeated invocations.
+    // Cache the system prompt — large SKILL.md prompts hit cache after the
+    // first call, cutting TTFT significantly on repeated invocations. The
+    // gateway passthrough forwards cache_control intact (verified against a
+    // ~7k-token system block: cache_creation on call 1, cache_read on call 2).
     system: [{ type: 'text', text: opts.systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: opts.userPrompt }],
   });

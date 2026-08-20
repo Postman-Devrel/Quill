@@ -1,6 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { generateText, parseJsonResponse } from '../lib/anthropic.js';
+import { fastModelId } from '../lib/gateway.js';
 import { getBlogIdeasSystemPrompt } from '../prompts/blog-ideas.js';
 
 interface BlogIdea {
@@ -84,7 +85,9 @@ export const blogIdeasTool = createTool({
       const raw = await generateText({
         systemPrompt: await getBlogIdeasSystemPrompt(),
         userPrompt,
-        model: 'claude-haiku-4-5-20251001',
+        // Scoring/ranking doesn't need the quality model — run on whatever
+        // the `models.fast` block in astropods.yml resolved to at deploy time.
+        model: fastModelId(),
         maxTokens: 2500,
       });
       const result = validateIdeasResult(parseJsonResponse(raw));
