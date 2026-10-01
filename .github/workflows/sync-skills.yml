@@ -31,3 +31,4 @@ jobs:
           branch: sync-devrel-skills
           delete-branch: true
           add-paths: skills/
+          reviewers: pmmistry
