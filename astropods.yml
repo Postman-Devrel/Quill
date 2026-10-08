@@ -30,6 +30,16 @@ agent:
       datatype: string
       secret: true
       description: API token for the service account. Generate at id.atlassian.com while signed in AS the service account (not your personal account).
+    - name: GOOGLE_SERVICE_ACCOUNT_EMAIL
+      datatype: string
+      secret: false
+      optional: true
+      description: Google Cloud service account's client_email (Drive API). Used to read and create Google Docs. Share source docs or folders with this email as Viewer.
+    - name: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+      datatype: string
+      secret: true
+      optional: true
+      description: Google Cloud service account's private_key (Drive API), including the BEGIN/END PRIVATE KEY lines. Used to read and create Google Docs.
 
 # Postman DevRel-specific constants live in code as defaults:
 #   - Confluence destination:  space "Quill", parent page 8244560849

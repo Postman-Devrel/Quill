@@ -14,3 +14,5 @@ export { updateConfluencePageTool } from './update-confluence-page.js';
 export { replyConfluenceCommentTool } from './reply-confluence-comment.js';
 export { createHeaderRequestTool } from './create-header-request.js';
 export { updateJiraTicketTool } from './update-jira-ticket.js';
+export { readGoogleDocTool } from './read-google-doc.js';
+export { saveToGoogleDocTool } from './save-to-google-doc.js';

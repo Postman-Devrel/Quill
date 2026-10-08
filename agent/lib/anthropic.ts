@@ -27,14 +27,22 @@ export interface GenerateOptions {
  */
 export async function generateText(opts: GenerateOptions): Promise<string> {
   const anthropic = getAnthropicClient();
-  const response = await anthropic.messages.create({
+  // Stream + await the final message: the SDK rejects non-streaming requests with
+  // a large max_tokens (long copy-edits), and streaming avoids HTTP timeouts.
+  const response = await anthropic.messages.stream({
     model: opts.model ?? 'claude-opus-4-7',
     max_tokens: opts.maxTokens ?? 8000,
     // Cache the system prompt at Anthropic — large SKILL.md prompts hit cache
     // after the first call, cutting TTFT significantly on repeated invocations.
     system: [{ type: 'text', text: opts.systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: opts.userPrompt }],
-  });
+  }).finalMessage();
+
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error(
+      `Response hit the ${opts.maxTokens ?? 8000}-token limit and was truncated.`,
+    );
+  }
 
   const textBlock = response.content.find((b) => b.type === 'text');
   if (!textBlock || textBlock.type !== 'text') {
