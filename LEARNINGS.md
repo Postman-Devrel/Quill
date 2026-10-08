@@ -96,7 +96,7 @@ Don't use 8000 for everything — Claude generates up to the limit you give it.
 | Tool | Appropriate maxTokens | Reasoning |
 |---|---|---|
 | `write_draft` | 3500 | 1200–1600 word post + frontmatter |
-| `copyedit_draft` | 5000 | Full edited draft + JSON wrapper |
+| `copyedit_draft` | 32000 | Full edited draft + JSON wrapper; sized for up to ~15K words |
 | `blog_ideas` | 2500 | JSON array of 8–12 scored ideas |
 
 ### Use a faster model for structured JSON scoring

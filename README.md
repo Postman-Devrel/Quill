@@ -2,7 +2,7 @@
 
 > *From idea to live post, without leaving Slack.*
 
-Quill is a Slack-first blog pipeline agent for Postman's DevRel team. Drop a topic in Slack and Quill researches it, drafts in Postman's developer-advocate voice, copy-edits for grammar / SEO / brand voice, saves every version to Confluence, files a Jira ticket for a matching header image, and stages the post to [blog.postman.com](https://blog.postman.com) as a WordPress draft — all in one conversation. **Scheduling and publishing stay with a human editor** in the WP admin panel. Quill can surface the next open Tue/Thu 8am PT publish slots as guidance but never acts on them.
+Quill is a Slack-first blog pipeline agent for Postman's DevRel team. Drop a topic in Slack and Quill researches it, drafts in Postman's developer-advocate voice, copy-edits for grammar / SEO / brand voice, saves every version to Confluence or a Google Doc (your choice), files a Jira ticket for a matching header image, and stages the post to [blog.postman.com](https://blog.postman.com) as a WordPress draft — all in one conversation. You can also hand Quill a Google Doc or Confluence link directly and it'll copy-edit, rewrite, or stage straight from it. **Scheduling and publishing stay with a human editor** in the WP admin panel. Quill can surface the next open Tue/Thu 8am PT publish slots as guidance but never acts on them.
 
 Built on [Mastra](https://mastra.ai) and deployed to the [Astropods](https://astropods.com) platform.
 
@@ -61,13 +61,13 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 - 🔎 **Coverage check before drafting** — searches blog.postman.com first to avoid duplicates
 - ✍️ **Postman-voice drafting** — 1200–1600 word technical drafts with SEO frontmatter, banned-word enforcement, and hybrid I/you/we voice
 - ✂️ **Copy-editing with flags** — auto-applies mechanical fixes (typos, banned words, code fences, capitalization); flags risky rewrites (sentence length, voice imbalance, weak titles) for human review
-- 📁 **Confluence sync** — every draft + every edit gets a Confluence page in the shared "Quill Drafts" space, owned by a bot service account
-- 🎨 **Automatic header-image tickets** — files a Jira ticket in `MKTG` with a link back to the Confluence draft so the design team can start work in parallel
-- 📤 **WordPress staging** — frontmatter-driven WP draft create-or-update, auto-tags, Yoast SEO. **Always `status=draft` — Quill never publishes.**
+- 📁 **Confluence or Google Docs sync** — every draft + every edit is saved to the shared "Quill Drafts" Confluence space OR a Google Doc, whichever the user picks (asked once per conversation)
+- 🎨 **Automatic header-image tickets** — files a Jira ticket in `MKTG` with a link back to the draft so the design team can start work in parallel
+- 📤 **WordPress staging** — frontmatter-driven WP draft create-or-update, auto-tags, Yoast SEO. **Always `status=draft` — Quill never publishes.** Can stage straight from a Google Doc or Confluence link.
 - 📅 **Editorial slot suggestions** — next open Tue/Thu 8am PT slots per the editorial rules (no Fri/Sat/Sun, no US holidays, no same-day conflicts). Informational only.
 - 📊 **Blog ideas** — parallel research + 0–100 scored ideas across 5 weighted criteria
 - 📈 **Publishing stats** — post counts across any date range with monthly breakdown
-- 🔄 **Read existing Confluence pages** — paste a URL and Quill imports it as markdown to copy-edit, rewrite as a blog, or file a header-image ticket for it
+- 🔄 **Read existing Confluence pages or Google Docs** — paste a URL and Quill imports it as markdown to copy-edit, rewrite as a blog, stage to WordPress, or file a header-image ticket for it
 
 ---
 
@@ -77,7 +77,9 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 @quill what should I write about MCP servers?
 @quill write me a blog about API rate limiting strategies
 @quill copy-edit this
+@quill copy-edit this: <google doc URL>
 @quill stage this to WordPress
+@quill stage this to WordPress: <google doc URL>
 @quill create a header ticket for this draft: <confluence URL>
 @quill when could this go live?
 @quill how many posts did we publish in Q1 2026?
@@ -89,13 +91,14 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 
 | # | Trigger | What Quill does |
 |---|---|---|
-| 1 | "write me a blog about X" | Coverage check → optional research → draft → Confluence save → Jira header ticket → reply with markdown + links |
-| 2 | "copy-edit this" | Copyedit → save edited version to Confluence → quality report + auto-applied changes + flagged suggestions |
+| 1 | "write me a blog about X" | Coverage check → optional research → draft → save draft (ask Google Doc/Confluence once) → Jira header ticket → reply with markdown + links |
+| 2 | "copy-edit this" | Copyedit → save edited version → quality report + auto-applied changes + flagged suggestions |
 | 3 | "stage this to WordPress" | Parse frontmatter → resolve tags → create or update WP draft (always `status=draft`) |
-| 4 | "create a header ticket for this draft: `<confluence URL>`" | Read Confluence page → file Jira ticket in `MKTG` with a link back to the draft |
+| 4 | "create a header ticket for this draft: `<URL>`" | File Jira ticket in `MKTG` with a link back to the draft (Confluence or Google Doc) |
 | 5 | "when could this go live?" | Show next Tue/Thu open publish slots (informational — human schedules in WP admin) |
-| 6 | "what should I write about?" | Parallel web searches → 8–12 scored ideas by urgency tier → Confluence save |
+| 6 | "what should I write about?" | Parallel web searches → 8–12 scored ideas by urgency tier → save draft |
 | 7 | Paste a Confluence URL | Read page as markdown → route to copyedit / write / blog_ideas / stage / header-ticket |
+| 8 | Paste a Google Doc URL | Read doc as markdown → route to copyedit / write / blog_ideas / stage / header-ticket |
 
 Plus quick lookups: `list_wp_schedule` (editorial calendar) and `wp_publish_stats` (date-range counts).
 
@@ -103,7 +106,8 @@ Plus quick lookups: `list_wp_schedule` (editorial calendar) and `wp_publish_stat
 
 ## Tool catalog
 
-12 tools — three make dedicated Claude calls with their own system prompts; the rest are pure API wrappers. **All WordPress interaction is stage-only.**
+Most tools are pure API wrappers; `write_draft`, `copyedit_draft`, and `blog_ideas` make dedicated
+Claude calls with their own system prompts. **All WordPress interaction is stage-only.**
 
 | Tool | Calls Claude? | Purpose |
 |---|:---:|---|
@@ -114,7 +118,9 @@ Plus quick lookups: `list_wp_schedule` (editorial calendar) and `wp_publish_stat
 | `blog_ideas` | ✅ | Score 8–12 ideas across 5 weighted criteria |
 | `save_to_confluence` | — | Create a Confluence page from markdown |
 | `read_confluence` | — | Read a Confluence page back as markdown |
-| `create_header_request` | — | File a Jira ticket in `MKTG` linking back to the Confluence draft |
+| `save_to_google_doc` | — | Create a Google Doc from markdown (Drive API, service account) |
+| `read_google_doc` | — | Read an accessible Google Doc as markdown using the service account |
+| `create_header_request` | — | File a Jira ticket in `MKTG` linking back to the draft (Confluence or Google Doc) |
 | `stage_to_wordpress` | — | Create/update a WordPress draft (always `status=draft`) |
 | `find_next_wp_slot` | — | Informational — next open Tue/Thu publish slots |
 | `list_wp_schedule` | — | Editorial calendar view |
@@ -136,8 +142,9 @@ Slack ──► Astropods messaging sidecar ──► MastraAdapter
                               │               │                         │
                        pure API tools    LLM-backed tools     Mastra conversation memory
                        (WP, Confluence,  (write_draft,        (in-memory SQLite, per-thread)
-                        Jira, Tavily,    copyedit_draft,
-                        scheduling)      blog_ideas)
+                        Google Drive,    copyedit_draft,
+                        Jira, Tavily,    blog_ideas)
+                        scheduling)
                                               │
                                               ▼
                                          @anthropic-ai/sdk
@@ -147,7 +154,7 @@ Slack ──► Astropods messaging sidecar ──► MastraAdapter
 
 - **Top-level Mastra agent** handles routing, conversation memory, and Slack streaming.
 - **Tools that need cognition** (`write_draft`, `copyedit_draft`, `blog_ideas`) make their own Anthropic SDK calls with dedicated system prompts. This preserves prompt isolation between drafting, editing, and scoring. The writer and copy-editor share a `prompts/style-guide.ts` file so voice/code/banned-word rules never drift.
-- **Pure API tools** wrap WordPress REST, Confluence REST, Jira REST v3 (ADF), Tavily, and an in-process scheduling library (`lib/scheduling.ts`).
+- **Pure API tools** wrap WordPress REST, Confluence REST, Google Drive REST (`lib/google-drive.ts`), Jira REST v3 (ADF), Tavily, and an in-process scheduling library (`lib/scheduling.ts`).
 
 State is intentionally minimal — Mastra's in-memory store carries the active conversation; nothing persists across container restarts.
 
@@ -163,6 +170,33 @@ One-time admin setup:
 3. Grant Jira `MKTG` "Create issue" permission.
 4. Generate an API token while signed in as the service account.
 
+The same pattern extends to Google: **one shared Google Cloud service account** creates every
+Google Doc draft. Unlike Confluence, there's no shared-space requirement — each new doc is shared
+"anyone with the link can edit" right after creation, so no destination folder needs to be set up
+first.
+
+One-time admin setup:
+1. Create (or reuse) a GCP project; enable the **Google Drive API**.
+2. Create a service account; generate a JSON key.
+3. Set `GOOGLE_SERVICE_ACCOUNT_EMAIL` (the key's `client_email`) and
+   `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (the key's `private_key`, keep the `\n` escapes). These
+   string vars are what the **deployed** container uses — Astropods secrets/vars don't support
+   mounting files.
+4. Optional: create a Drive folder and set `GOOGLE_DRIVE_FOLDER_ID` to file new docs under it
+   instead of the service account's own Drive root — purely organizational, not required for
+   access.
+
+For **local dev only**, you can instead set `GOOGLE_APPLICATION_CREDENTIALS` to the path of the
+downloaded JSON key file and skip the two vars above — Quill reads `client_email`/`private_key`
+straight out of it. This is the same convention Google's own client libraries use, and what the
+`devrel-claude-code-skills` `meetup-calendar` skill does. It won't work once deployed, since that
+file path won't exist on the container.
+
+Reading Google Docs uses the same service account and the Drive API. Share each private source
+document or its parent folder with the service-account email as **Viewer**. Public link sharing
+is not required. Quill can only read files accessible to that account, and currently supports
+Google Docs content (not PDFs, Sheets, or Slides).
+
 ---
 
 ## Configuration
@@ -177,6 +211,10 @@ Astropods auto-injects `ANTHROPIC_API_KEY` because `astropods.yml` declares `mod
 | `CONFLUENCE_EMAIL` | ✅ | Service-account email — also authorizes Jira |
 | `CONFLUENCE_API_TOKEN` | ✅ | API token for the service account — one token, both products |
 | `CONFLUENCE_BASE_URL` | optional | Defaults to `https://postmanlabs.atlassian.net/wiki` |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | for Google Docs | Service account `client_email` — used to read and create Google Docs. Required for deployment. |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | for Google Docs | Service account `private_key` (keep the `\n` escapes). Required for deployment. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | local-dev alternative | Path to the service account JSON key file — reads the two vars above out of it. **Local dev only**, not usable once deployed. |
+| `GOOGLE_DRIVE_FOLDER_ID` | optional | Drive folder new docs are filed under. Purely organizational — every doc is shared "anyone with the link can edit" on creation regardless. |
 
 Postman DevRel-specific constants are baked into the code:
 
@@ -218,6 +256,7 @@ ast secrets create TAVILY_API_KEY
 ast secrets create WP_USERNAME
 ast secrets create WP_APP_PASSWORD
 ast secrets create CONFLUENCE_API_TOKEN
+ast secrets create GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY   # only if Google Doc drafts are enabled
 
 # 3. Deploy — secrets via @ shorthand, non-secret vars passed literally
 ast deploy @postman/quill \
@@ -227,6 +266,8 @@ ast deploy @postman/quill \
   --var CONFLUENCE_API_TOKEN=@ \
   --var CONFLUENCE_EMAIL=service.quill@postman.com \
   --var CONFLUENCE_SPACE_KEY=Quill \
+  --var GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=@ \
+  --var GOOGLE_SERVICE_ACCOUNT_EMAIL=quill-bot@your-project.iam.gserviceaccount.com \
   --adapter web \
   --adapter slack \
   --name "Quill" \
@@ -275,10 +316,11 @@ Quill/
     │   ├── copyedit.ts        # copy-editor system prompt (auto-fix + flags)
     │   ├── blog-ideas.ts      # idea-scoring system prompt
     │   └── style-guide.ts     # shared voice/code/banned-word blocks
-    ├── tools/                 # 12 tool definitions
+    ├── tools/                 # tool definitions
     └── lib/
         ├── anthropic.ts       # @anthropic-ai/sdk wrapper
         ├── confluence.ts      # Confluence REST client (service account)
+        ├── google-drive.ts    # Drive API client (service account) — authenticated reads and writes
         ├── jira.ts            # Jira REST v3 client (ADF descriptions)
         ├── wordpress.ts       # WP REST client
         ├── markdown.ts        # frontmatter + marked wrapper

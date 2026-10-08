@@ -25,6 +25,8 @@ import {
   replyConfluenceCommentTool,
   createHeaderRequestTool,
   updateJiraTicketTool,
+  readGoogleDocTool,
+  saveToGoogleDocTool,
 } from './tools/index.js';
 
 function resolveOtlpEndpoint(): string {
@@ -83,6 +85,8 @@ const agent = new Agent({
     reply_confluence_comment: replyConfluenceCommentTool,
     create_header_request: createHeaderRequestTool,
     update_jira_ticket: updateJiraTicketTool,
+    read_google_doc: readGoogleDocTool,
+    save_to_google_doc: saveToGoogleDocTool,
   },
   defaultOptions: {
     tracingOptions: {

@@ -72,6 +72,19 @@ export const stageToWordPressTool = createTool({
         };
       }
 
+      // Every staged post must carry SEO + AEO metadata. Refuse rather than stage without it;
+      // copyedit_draft mode="seo_only" fills these in without touching the body.
+      const missingSeo = [
+        !metaDescription.trim() && 'meta_description',
+        !focusKeyphrase.trim() && 'primary_keyword',
+        !frontmatterString(frontmatter, 'answer_summary').trim() && 'answer_summary (AEO)',
+      ].filter(Boolean);
+      if (missingSeo.length > 0) {
+        return {
+          error: `Not staged: missing SEO/AEO metadata (${missingSeo.join(', ')}). Run copyedit_draft with mode="seo_only" on this markdown (body is left untouched), then call stage_to_wordpress again with its editedDraft.`,
+        };
+      }
+
       // A missing meta description hurts SEO — surface it rather than staging silently.
       const metaWarning =
         metaDescription.trim() === ''
