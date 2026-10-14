@@ -44,11 +44,22 @@ interface ServiceAccountCredentials {
  * (required for the deployed container) or a local GOOGLE_APPLICATION_CREDENTIALS
  * JSON key file (local-dev convenience, matching Google's own ADC convention).
  */
+export function normalizeGooglePrivateKey(raw: string): string {
+  const decoded = raw.replace(/\\n/g, '\n').trim();
+  const match = decoded.match(/^-----BEGIN PRIVATE KEY-----([\s\S]+)-----END PRIVATE KEY-----$/);
+  if (!match) throw new Error('Google service-account private key must contain BEGIN/END PRIVATE KEY markers.');
+  const body = match[1].replace(/\s/g, '');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body)) {
+    throw new Error('Google service-account private key contains invalid PEM data.');
+  }
+  return `-----BEGIN PRIVATE KEY-----\n${body.match(/.{1,64}/g)!.join('\n')}\n-----END PRIVATE KEY-----\n`;
+}
+
 function resolveServiceAccountCredentials(): ServiceAccountCredentials {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
   if (email && rawKey) {
-    return { email, privateKey: rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey };
+    return { email, privateKey: normalizeGooglePrivateKey(rawKey) };
   }
 
   const credsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -64,7 +75,7 @@ function resolveServiceAccountCredentials(): ServiceAccountCredentials {
     if (parsed.type !== 'service_account' || !parsed.client_email || !parsed.private_key) {
       throw new Error(`GOOGLE_APPLICATION_CREDENTIALS at "${credsPath}" is not a service account key file.`);
     }
-    return { email: parsed.client_email, privateKey: parsed.private_key };
+    return { email: parsed.client_email, privateKey: normalizeGooglePrivateKey(parsed.private_key) };
   }
 
   throw new Error(

@@ -351,3 +351,69 @@ Quill/
 ## Contributing
 
 Quill is built and maintained by the Postman DevRel team. Pull requests welcome from teammates; for external contributions, please open an issue first to discuss scope.
+
+## Video → SEO/AEO blog
+
+Quill turns a **video transcript** into an SEO/AEO article. The transcript comes from a public
+**YouTube** video's captions, a **Loom** share link's transcript, or text you paste into the chat.
+Claude uses Quill's Postman writing guidance to produce a standalone article. Only the spoken
+words are used: code, UI, or terminal output that is shown but never said will not appear, and
+auto-generated captions can misspell product names. Review technical claims before publishing.
+
+Example prompts:
+
+```text
+Turn https://www.youtube.com/watch?v=VIDEO_ID into an SEO/AEO blog for API developers.
+Write a blog from this Loom: https://www.loom.com/share/<id>
+Write a blog from this transcript: <pasted text>
+```
+
+### Setup
+
+Quill needs only its existing `ANTHROPIC_API_KEY`. Loom and (by default) YouTube transcripts are
+fetched from the same public endpoints their web players use, with no API key. YouTube blocks that
+keyless fetch from cloud IPs, so for videos on a channel you manage, add the optional
+`YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` and `YOUTUBE_REFRESH_TOKEN` (see below). When all three
+are set Quill uses the official YouTube Data API first and falls back to the keyless fetch.
+Saving the resulting article to Google Docs uses the Drive service account as usual.
+
+#### YouTube OAuth setup
+
+1. In Google Cloud, enable **YouTube Data API v3** and create an **OAuth client ID** (type: Web
+   application) with redirect URI `https://developers.google.com/oauthplayground`. Set the consent
+   screen to **Internal** (Workspace) or **In production**; refresh tokens for apps left in
+   "Testing" expire after 7 days.
+2. At [OAuth Playground](https://developers.google.com/oauthplayground), open the settings gear, tick
+   **Use your own OAuth credentials**, and enter the client ID and secret. Authorize the scope
+   `https://www.googleapis.com/auth/youtube.force-ssl` while signed in as an account with edit access
+   to the channel, then exchange the code and copy the **refresh token**.
+3. Store them: `ast secrets set YOUTUBE_CLIENT_ID ...`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN`.
+
+The API only downloads captions for videos that account owns or can edit; other videos fall back to
+the keyless fetch, then to pasting the transcript.
+
+`video_to_blog` does everything in one call (about a minute): it fetches the transcript, has Claude
+write the article, and saves it to **Confluence**, then Quill replies with the page link and the
+review notes (likely caption errors, on-screen details to verify). There is nothing to check back
+on. If the Confluence save fails, Quill still returns the draft. Ticket creation and WordPress
+staging remain separate requests.
+
+### Limits and fallbacks
+
+- Those endpoints are undocumented and can change. If a fetch fails, Quill asks you to paste the
+  transcript (Loom: Transcript tab → copy; YouTube: ⋯ → Show transcript → copy).
+- YouTube videos must be public and have captions. Loom links must be public and transcribed;
+  private, workspace-only, or password-protected Looms need a pasted transcript.
+- Transcripts over 120,000 characters are rejected; split them.
+- Transcript text is treated as source material, not instructions for tools or publication.
+- SEO/AEO suggestions are editorial metadata, not measured search volumes or ranking guarantees.
+- Nothing is stored locally: no job files or volume are needed.
+
+### Verification
+
+```bash
+# Inside the running container (network calls mocked):
+docker exec quill-agent-1 bun test agent/video/video.test.ts agent/lib/google-drive.test.ts
+```
+
+Mocked tests do not verify the live YouTube/Loom endpoints; try a real link after deploying.

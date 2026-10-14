@@ -1,3 +1,4 @@
+import { videoToBlogTool } from './tools/video-to-blog.js';
 import { Agent } from '@mastra/core/agent';
 import { Mastra } from '@mastra/core/mastra';
 import { Memory } from '@mastra/memory';
@@ -69,6 +70,7 @@ const agent = new Agent({
   model: 'anthropic/claude-opus-4-7',
   memory,
   tools: {
+    video_to_blog: videoToBlogTool,
     web_search: webSearchTool,
     write_draft: writeDraftTool,
     copyedit_draft: copyeditDraftTool,

@@ -56,3 +56,15 @@ test('rejects non-Docs before attempting export', async () => {
   await expect(readGoogleDoc('abcdefghijklmnop')).rejects.toThrow('supports Google Docs only');
   expect(calls.some(url => url.includes('/export?'))).toBe(false);
 });
+
+
+test('normalizes real, escaped, and flattened PEM newlines without changing the key', async () => {
+  const { normalizeGooglePrivateKey } = await import('./google-drive');
+  const { createPrivateKey } = await import('node:crypto');
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  for (const variant of [pem, pem.replace(/\n/g, '\\n'), pem.replace(/\n/g, ' ')]) {
+    const parsed = createPrivateKey(normalizeGooglePrivateKey(variant));
+    expect(parsed.export({ type: 'pkcs8', format: 'pem' }).toString()).toBe(pem);
+  }
+  expect(() => normalizeGooglePrivateKey('not a key')).toThrow('BEGIN/END');
+});
