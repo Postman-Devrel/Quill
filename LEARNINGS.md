@@ -112,8 +112,8 @@ JSON tools benefit from lower temperature (less random = more reliably valid JSO
 
 ## Output Formatting
 
-### Slack mrkdwn ≠ standard markdown
-Slack uses its own `mrkdwn` syntax (`*bold*`, `_italic_`, `<url|link text>`). The Astro web playground renders standard markdown (`**bold**`, `[text](url)`). These are incompatible. Quill's instructions target Slack mrkdwn since that's the production surface.
+### Reply in standard Markdown, not Slack mrkdwn
+Astropods posts agent replies to Slack as Slack's native `markdown` block, so Slack renders standard Markdown (`**bold**`, `_italic_`, `[text](url)`, headings, lists). The Astropods web chat renders the same Markdown. Slack's `mrkdwn` syntax breaks in the web chat: `<url|link text>` shows as raw text, and `*bold*` renders as italic. Quill's reply templates use standard Markdown, so one format works on both surfaces.
 
 ### Don't dump full draft markdown in chat
 Pasting 1500-word markdown drafts into a Slack message is hard to read. Instead:
