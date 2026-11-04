@@ -33,6 +33,16 @@ blog.postman.com. You never schedule or publish — a human editor does that.
   calls before calling this tool.
 - **wp_publish_stats(startDate, endDate)** — count posts published on blog.postman.com between
   two YYYY-MM-DD dates. Returns total + per-post listing + monthly breakdown.
+- **blog_analytics(view, ...)** — READ-ONLY traffic performance from WordPress (Jetpack) Stats.
+  Use for any "how did X perform / how many views / what's top / where does traffic come from"
+  question. Views: "site" (views + visitors per day/week/month with change vs previous period),
+  "top_posts" (most-viewed posts, last N days), "post" (lifetime / 7-day / 30-day views for one
+  post — pass its URL or slug), "recent_posts" (performance of posts published between
+  startDate and endDate — use this for "how did last week's posts do?"), "referrers", and
+  "search_terms". Report only the numbers the tool returns. These are WordPress page views, not
+  Google Analytics — there is no conversion or engagement data, so say so if asked. Newer posts
+  have had less time to collect views: compare avgViewsPerDay across posts of different age, and
+  note that today's count is partial. Do NOT use it for publish counts (wp_publish_stats).
 - **check_blog_coverage(topic)** — search blog.postman.com for existing posts on a topic
   (across publish, future, draft, pending). Use BEFORE write_draft to avoid duplicating
   content. Returns matchCount + existingPosts[].

@@ -21,7 +21,7 @@ function decodeHtmlEntities(s: string): string {
     .replace(/&#39;/g, "'");
 }
 
-async function wpFetch(
+export async function wpFetch(
   path: string,
   init: RequestInit & { jsonBody?: unknown } = {},
 ): Promise<Response> {
@@ -36,7 +36,8 @@ async function wpFetch(
     headers['Content-Type'] = 'application/json';
     body = JSON.stringify(init.jsonBody);
   }
-  return fetch(`${WP_BASE}${path}`, { ...init, headers, body });
+  const url = path.startsWith('https://') ? path : `${WP_BASE}${path}`;
+  return fetch(url, { ...init, headers, body });
 }
 
 export interface ResolvedTag {

@@ -100,7 +100,7 @@ Quill  ✂️ Copy-editing — about 30 seconds...
 | 7 | Paste a Confluence URL | Read page as markdown → route to copyedit / write / blog_ideas / stage / header-ticket |
 | 8 | Paste a Google Doc URL | Read doc as markdown → route to copyedit / write / blog_ideas / stage / header-ticket |
 
-Plus quick lookups: `list_wp_schedule` (editorial calendar) and `wp_publish_stats` (date-range counts).
+Plus quick lookups: `list_wp_schedule` (editorial calendar), `wp_publish_stats` (date-range counts), and `blog_analytics` (WordPress/Jetpack traffic stats).
 
 ---
 
@@ -125,6 +125,7 @@ Claude calls with their own system prompts. **All WordPress interaction is stage
 | `find_next_wp_slot` | — | Informational — next open Tue/Thu publish slots |
 | `list_wp_schedule` | — | Editorial calendar view |
 | `wp_publish_stats` | — | Date-range publish counts with monthly breakdown |
+| `blog_analytics` | — | WordPress (Jetpack) Stats: site traffic, top posts, per-post performance, referrers, search terms. Read-only; uses the existing WP login |
 
 ---
 

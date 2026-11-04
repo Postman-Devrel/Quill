@@ -6,6 +6,7 @@ export { findNextWpSlotTool } from './find-next-wp-slot.js';
 export { listWpScheduleTool } from './list-wp-schedule.js';
 export { blogIdeasTool } from './blog-ideas.js';
 export { wpPublishStatsTool } from './wp-publish-stats.js';
+export { blogAnalyticsTool } from './blog-analytics.js';
 export { checkBlogCoverageTool } from './check-blog-coverage.js';
 export { saveToConfluenceTool } from './save-to-confluence.js';
 export { readConfluenceTool } from './read-confluence.js';
