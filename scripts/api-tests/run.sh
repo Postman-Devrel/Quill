@@ -37,7 +37,11 @@ for c in "${TARGETS[@]}"; do
   fi
   echo; echo "=== $c"
   # --output also writes *-executions.yaml, which records request headers/bodies (i.e. secrets); keep only the summary.
-  if postman collection run "postman/collections/$c" -e "$ENVFILE" "${ARGS[@]}" ${extra[@]+"${extra[@]}"} --output "$REPORTS/$c"; then
+  mkdir -p "$REPORTS"
+  out=()
+  # --output needs `postman login`; CI is not logged in, so it falls back to the console log alone.
+  if postman whoami 2>&1 | grep -q "^Logged in"; then out=(--output "$REPORTS/$c"); fi
+  if postman collection run "postman/collections/$c" -e "$ENVFILE" "${ARGS[@]}" ${extra[@]+"${extra[@]}"} ${out[@]+"${out[@]}"} 2>&1 | tee "$REPORTS/$c.log"; then
     summary+=("PASS  $c")
   else
     summary+=("FAIL  $c"); fail=1
