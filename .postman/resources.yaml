@@ -1,3 +1,16 @@
+cloudResources:
+  collections:
+    ../postman/collections/quill-anthropic-api: 20042574-47755865-447b-4a98-8af6-237b22503456
+    ../postman/collections/quill-confluence-api: 20042574-61cd53f4-34ee-46bc-a27e-c89efde5d5b1
+    ../postman/collections/quill-confluence-api-page-lifecycle: 20042574-a4a32b3f-c671-4de4-ba74-14bdac2f1368
+    ../postman/collections/quill-google-drive-api: 20042574-e66b208e-2071-40ae-a246-6b189c9bfdbf
+    ../postman/collections/quill-jetpack-stats-api: 20042574-b681f964-d545-42e6-9dac-24014031fc04
+    ../postman/collections/quill-jira-api: 20042574-c1e2a4ad-0425-4086-8286-c63190cca322
+    ../postman/collections/quill-tavily-api: 20042574-3b371887-8278-4473-ab3f-7eee6472d2bf
+    ../postman/collections/quill-wordpress-rest-api: 20042574-b802be30-744c-48cd-b0c3-b9b2aa6e85dc
+    ../postman/collections/quill-youtube-api: 20042574-e7dd1b12-e145-4148-ad9a-8ed60ba77a90
+  environments:
+    ../postman/environments/Quill.environment.yaml: 20042574-aea80e66-a4ca-4776-8c4f-afe088a8cb55
 workspace:
   id: e33ad683-d3ac-4e43-83c6-15f14c2de631
   name: Postman-Devrel/Quill
