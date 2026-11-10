@@ -1,0 +1,27 @@
+$kind: http-request
+name: "Create draft"
+method: POST
+url: "{{wp_base}}/posts"
+order: 1000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "title": "[QUILL-API-TEST] safe to delete",
+      "content": "<p>Automated API check. Deleted at the end of the run.</p>",
+      "status": "draft"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 201', () => pm.response.to.have.status(201));
+      const body = pm.response.json();
+      pm.test('Created as draft, not published', () => pm.expect(body.status).to.eql('draft'));
+      pm.test('Has id and edit-able content', () => { pm.expect(body.id).to.be.a('number'); pm.expect(body.title.rendered).to.include('QUILL-API-TEST'); });
+      pm.collectionVariables.set('wp_test_post_id', String(body.id));

@@ -1,0 +1,24 @@
+$kind: http-request
+name: "JQL search for an issue to read"
+method: GET
+url: "{{jira_base}}/rest/api/3/search/jql?jql=reporter = currentUser() ORDER BY created DESC&maxResults=1&fields=summary"
+order: 3000
+queryParams:
+  - key: "jql"
+    value: "reporter = currentUser() ORDER BY created DESC"
+  - key: "maxResults"
+    value: "1"
+  - key: "fields"
+    value: "summary"
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('issues is an array', () => pm.expect(body.issues).to.be.an('array'));
+      if (body.issues.length) pm.collectionVariables.set('jira_issue_key', body.issues[0].key);
+      else console.log('No issues reported by this identity - issue-level checks will fail until one exists.');

@@ -1,0 +1,42 @@
+name: Quill
+values:
+  - key: anthropic_api_key
+    value: ''
+    enabled: true
+    type: secret
+    description: Injected by scripts/api-tests/run.sh from ANTHROPIC_API_KEY
+  - key: tavily_api_key
+    value: ''
+    enabled: true
+    type: secret
+    description: Injected from TAVILY_API_KEY
+  - key: wp_basic_auth
+    value: ''
+    enabled: true
+    type: secret
+    description: base64(WP_USERNAME:WP_APP_PASSWORD), computed by the runner
+  - key: atlassian_basic_auth
+    value: ''
+    enabled: true
+    type: secret
+    description: base64(CONFLUENCE_EMAIL:CONFLUENCE_API_TOKEN), computed by the runner
+  - key: google_access_token
+    value: ''
+    enabled: true
+    type: secret
+    description: Minted by scripts/api-tests/mint-google-token.mjs
+  - key: confluence_space_key
+    value: ''
+    enabled: true
+    type: default
+    description: Injected from CONFLUENCE_SPACE_KEY; page-lifecycle collection is skipped when empty
+  - key: google_service_account_email
+    value: ''
+    enabled: true
+    type: default
+    description: Injected from GOOGLE_SERVICE_ACCOUNT_EMAIL
+  - key: google_drive_folder_id
+    value: ''
+    enabled: true
+    type: default
+    description: Injected from GOOGLE_DRIVE_FOLDER_ID; must be in a shared drive, since service accounts have no storage quota

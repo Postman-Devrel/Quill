@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Current user (credentials + Jira access)"
+method: GET
+url: "{{jira_base}}/rest/api/3/myself"
+order: 1000
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Token has Jira product access', () => { pm.expect(body.accountId).to.be.a('string'); pm.expect(body.active).to.eql(true); });

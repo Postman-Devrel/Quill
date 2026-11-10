@@ -1,0 +1,14 @@
+$kind: http-request
+name: "Export doc as HTML (read-google-doc)"
+method: GET
+url: "{{drive_base}}/files/{{drive_test_file_id}}/export?mimeType=text/html"
+order: 5000
+queryParams:
+  - key: "mimeType"
+    value: "text/html"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      pm.test('Exported HTML contains the heading', () => pm.expect(pm.response.text()).to.include('Quill API test'));

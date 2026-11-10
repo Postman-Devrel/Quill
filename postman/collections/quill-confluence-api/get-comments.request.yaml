@@ -1,0 +1,23 @@
+$kind: http-request
+name: "Get page comments (read-confluence-comments)"
+method: GET
+url: "{{confluence_base}}/rest/api/content/{{confluence_page_id}}/child/comment?expand=body.storage,extensions.inlineProperties,extensions.resolution,history.createdBy&depth=all&limit=100"
+order: 5000
+queryParams:
+  - key: "expand"
+    value: "body.storage,extensions.inlineProperties,extensions.resolution,history.createdBy"
+  - key: "depth"
+    value: "all"
+  - key: "limit"
+    value: "100"
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('results is an array', () => pm.expect(body.results).to.be.an('array'));
+      pm.test('Comments expose body and author when present', () => body.results.forEach((c) => { pm.expect(c.body.storage.value).to.be.a('string'); pm.expect(c.history.createdBy).to.be.an('object'); }));

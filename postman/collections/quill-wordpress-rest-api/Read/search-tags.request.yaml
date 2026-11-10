@@ -1,0 +1,20 @@
+$kind: http-request
+name: "Search tags"
+method: GET
+url: "{{wp_base}}/tags?search=api&per_page=5"
+order: 5000
+queryParams:
+  - key: "search"
+    value: "api"
+  - key: "per_page"
+    value: "5"
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Tags have id and name', () => body.forEach((t) => { pm.expect(t.id).to.be.a('number'); pm.expect(t.name).to.be.a('string'); }));

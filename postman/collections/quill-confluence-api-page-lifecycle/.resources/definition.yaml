@@ -1,0 +1,15 @@
+$kind: collection
+name: "Quill - Confluence REST API (page lifecycle)"
+description: "Creates a [QUILL-API-TEST] page in CONFLUENCE_SPACE_KEY, updates it, comments on it, then deletes and purges it. Skipped by the runner when CONFLUENCE_SPACE_KEY is empty."
+variables:
+  - key: "confluence_base"
+    value: "https://postmanlabs.atlassian.net/wiki"
+auth:
+  type: apikey
+  credentials:
+    - key: "key"
+      value: "Authorization"
+    - key: "value"
+      value: "Basic {{atlassian_basic_auth}}"
+    - key: "in"
+      value: "header"

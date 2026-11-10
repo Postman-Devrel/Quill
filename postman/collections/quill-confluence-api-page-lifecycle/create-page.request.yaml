@@ -1,0 +1,28 @@
+$kind: http-request
+name: "Create page"
+method: POST
+url: "{{confluence_base}}/rest/api/content"
+order: 1000
+headers:
+  - key: "Accept"
+    value: "application/json"
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "type": "page",
+      "title": "[QUILL-API-TEST] safe to delete",
+      "space": {"key": "{{confluence_space_key}}"},
+      "body": {"storage": {"value": "<p>Automated API check.</p>", "representation": "storage"}}
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Created in the configured space', () => { pm.expect(body.id).to.be.a('string'); pm.expect(body.space.key).to.eql(pm.environment.get('confluence_space_key')); });
+      pm.test('Has a webui link', () => pm.expect(body._links.webui).to.be.a('string'));
+      pm.collectionVariables.set('confluence_test_page_id', body.id);

@@ -1,0 +1,26 @@
+$kind: http-request
+name: "Update page (version bump)"
+method: PUT
+url: "{{confluence_base}}/rest/api/content/{{confluence_test_page_id}}"
+order: 2000
+headers:
+  - key: "Accept"
+    value: "application/json"
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "type": "page",
+      "title": "[QUILL-API-TEST] safe to delete",
+      "version": {"number": 2},
+      "body": {"storage": {"value": "<p>Updated.</p>", "representation": "storage"}}
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Version incremented to 2', () => pm.expect(body.version.number).to.eql(2));

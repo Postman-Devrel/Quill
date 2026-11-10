@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Get draft"
+method: GET
+url: "{{wp_base}}/posts/{{wp_test_post_id}}"
+order: 3000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Round-trips the update', () => { pm.expect(String(body.id)).to.eql(pm.collectionVariables.get('wp_test_post_id')); pm.expect(body.status).to.eql('draft'); });

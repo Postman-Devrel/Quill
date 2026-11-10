@@ -1,0 +1,32 @@
+$kind: http-request
+name: "Messages - invalid key returns 401"
+method: POST
+url: "{{anthropic_base}}/v1/messages"
+order: 4000
+headers:
+  - key: "anthropic-version"
+    value: "2023-06-01"
+  - key: "content-type"
+    value: "application/json"
+  - key: "x-api-key"
+    value: "invalid-key-for-test"
+body:
+  type: json
+  content: |-
+    {
+      "model": "{{anthropic_fast_model}}",
+      "max_tokens": 16,
+      "messages": [{"role": "user", "content": "Reply with the single word: ok"}]
+    }
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 401', () => pm.response.to.have.status(401));
+      const body = pm.response.json();
+      pm.test('Error envelope is authentication_error', () => {
+        pm.expect(body.type).to.eql('error');
+        pm.expect(body.error.type).to.eql('authentication_error');
+      });

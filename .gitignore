@@ -15,3 +15,4 @@ bun.lockb
 *-key.json
 secrets/
 gcloud/
+postman/reports/

@@ -1,0 +1,18 @@
+$kind: http-request
+name: "List spaces"
+method: GET
+url: "{{confluence_base}}/rest/api/space?limit=5"
+order: 2000
+queryParams:
+  - key: "limit"
+    value: "5"
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('results is an array of spaces with keys', () => { pm.expect(body.results).to.be.an('array'); body.results.forEach((s) => pm.expect(s.key).to.be.a('string')); });

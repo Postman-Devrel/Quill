@@ -1,0 +1,23 @@
+$kind: http-request
+name: "Site visits (7 days)"
+method: GET
+url: "{{stats_base}}/stats/visits?unit=day&quantity=7&date={{stats_end}}"
+order: 1000
+queryParams:
+  - key: "unit"
+    value: "day"
+  - key: "quantity"
+    value: "7"
+  - key: "date"
+    value: "{{stats_end}}"
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('fields include views and visitors', () => { pm.expect(body.fields).to.include('views'); pm.expect(body.fields).to.include('visitors'); });
+      pm.test('data rows match fields width', () => { pm.expect(body.data).to.be.an('array').that.is.not.empty; body.data.forEach((r) => pm.expect(r).to.have.lengthOf(body.fields.length)); });

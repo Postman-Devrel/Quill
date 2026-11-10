@@ -1,0 +1,13 @@
+$kind: collection
+name: "Quill - Google Drive API v3"
+description: "Service-account Drive calls from agent/lib/google-drive.ts. Token comes from scripts/api-tests/mint-google-token.mjs (same JWT-bearer flow Quill uses). Creates a [QUILL-API-TEST] doc and deletes it."
+variables:
+  - key: "drive_base"
+    value: "https://www.googleapis.com/drive/v3"
+  - key: "drive_upload_base"
+    value: "https://www.googleapis.com/upload/drive/v3"
+auth:
+  type: bearer
+  credentials:
+    - key: "token"
+      value: "{{google_access_token}}"

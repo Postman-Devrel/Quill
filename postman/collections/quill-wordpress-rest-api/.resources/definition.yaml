@@ -1,0 +1,17 @@
+$kind: collection
+name: "Quill - WordPress REST API"
+description: "blog.postman.com wp/v2 as used by agent/lib/wordpress.ts. \"Draft lifecycle\" creates a [QUILL-API-TEST] draft and force-deletes it; nothing is published."
+variables:
+  - key: "wp_base"
+    value: "https://blog.postman.com/wp-json/wp/v2"
+  - key: "wp_user_agent"
+    value: "Quill/1.0 (Postman DevRel)"
+auth:
+  type: apikey
+  credentials:
+    - key: "key"
+      value: "Authorization"
+    - key: "value"
+      value: "Basic {{wp_basic_auth}}"
+    - key: "in"
+      value: "header"

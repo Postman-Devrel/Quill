@@ -1,0 +1,26 @@
+$kind: http-request
+name: "Referrers (30 days)"
+method: GET
+url: "{{stats_base}}/stats/referrers?period=day&num=30&date={{stats_end}}&max=100&summarize=1"
+order: 4000
+queryParams:
+  - key: "period"
+    value: "day"
+  - key: "num"
+    value: "30"
+  - key: "date"
+    value: "{{stats_end}}"
+  - key: "max"
+    value: "100"
+  - key: "summarize"
+    value: "1"
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('summary.groups is an array of {name,total,results}', () => { pm.expect(body.summary.groups).to.be.an('array'); body.summary.groups.forEach((g) => { pm.expect(g.name).to.be.a('string'); pm.expect(g.total).to.be.a('number'); pm.expect(g).to.have.property('results'); }); });

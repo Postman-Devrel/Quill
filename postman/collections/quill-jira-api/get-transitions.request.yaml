@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Get transitions"
+method: GET
+url: "{{jira_base}}/rest/api/3/issue/{{jira_issue_key}}/transitions"
+order: 5000
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('transitions have id and name', () => { pm.expect(body.transitions).to.be.an('array'); body.transitions.forEach((t) => { pm.expect(t.id).to.be.a('string'); pm.expect(t.name).to.be.a('string'); }); });

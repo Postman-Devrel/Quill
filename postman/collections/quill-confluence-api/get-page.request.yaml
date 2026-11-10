@@ -1,0 +1,18 @@
+$kind: http-request
+name: "Get page (read-confluence)"
+method: GET
+url: "{{confluence_base}}/rest/api/content/{{confluence_page_id}}?expand=body.storage,space,version"
+order: 4000
+queryParams:
+  - key: "expand"
+    value: "body.storage,space,version"
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Expanded body, space and version present', () => { pm.expect(body.body.storage.value).to.be.a('string'); pm.expect(body.space.key).to.be.a('string'); pm.expect(body.version.number).to.be.a('number'); });

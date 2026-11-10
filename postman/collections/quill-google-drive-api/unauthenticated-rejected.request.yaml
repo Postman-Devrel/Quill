@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Missing token is rejected"
+method: GET
+url: "{{drive_base}}/about?fields=user"
+order: 7000
+queryParams:
+  - key: "fields"
+    value: "user"
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 401', () => pm.expect(pm.response.code).to.eql(401));

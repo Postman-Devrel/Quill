@@ -1,0 +1,24 @@
+$kind: collection
+name: "Quill - Jetpack Stats API"
+description: "Read-only WordPress.com Stats proxied through blog.postman.com (agent/lib/wp-stats.ts). Same WP credentials."
+variables:
+  - key: "stats_base"
+    value: "https://blog.postman.com/wp-json/jetpack/v4/stats-app/sites/{{jetpack_blog_id}}"
+  - key: "jetpack_blog_id"
+    value: "199676833"
+  - key: "wp_user_agent"
+    value: "Quill/1.0 (Postman DevRel)"
+auth:
+  type: apikey
+  credentials:
+    - key: "key"
+      value: "Authorization"
+    - key: "value"
+      value: "Basic {{wp_basic_auth}}"
+    - key: "in"
+      value: "header"
+scripts:
+  - type: http:beforeRequest
+    language: text/javascript
+    code: |-
+      pm.variables.set('stats_end', new Date().toISOString().slice(0, 10));

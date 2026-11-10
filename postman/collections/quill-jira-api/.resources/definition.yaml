@@ -1,0 +1,15 @@
+$kind: collection
+name: "Quill - Jira REST API v3 (read)"
+description: "Read-only checks of the Jira calls in agent/lib/jira.ts. Issue creation, transitions and watcher writes are intentionally not exercised."
+variables:
+  - key: "jira_base"
+    value: "https://postmanlabs.atlassian.net"
+auth:
+  type: apikey
+  credentials:
+    - key: "key"
+      value: "Authorization"
+    - key: "value"
+      value: "Basic {{atlassian_basic_auth}}"
+    - key: "in"
+      value: "header"

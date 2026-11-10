@@ -1,0 +1,28 @@
+$kind: http-request
+name: "List published posts"
+method: GET
+url: "{{wp_base}}/posts?status=publish&per_page=1&_fields=id,slug,title,link,date"
+order: 3000
+queryParams:
+  - key: "status"
+    value: "publish"
+  - key: "per_page"
+    value: "1"
+  - key: "_fields"
+    value: "id,slug,title,link,date"
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Returns one post with expected fields', () => {
+        pm.expect(body).to.have.lengthOf(1);
+        ['id', 'slug', 'link', 'date'].forEach((f) => pm.expect(body[0]).to.have.property(f));
+        pm.expect(body[0].title.rendered).to.be.a('string');
+      });
+      pm.test('X-WP-Total header present (used for pagination)', () => pm.expect(pm.response.headers.get('X-WP-Total')).to.match(/^\d+$/));
+      pm.collectionVariables.set('wp_post_id', String(body[0].id));

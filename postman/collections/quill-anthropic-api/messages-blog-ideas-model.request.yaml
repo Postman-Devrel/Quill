@@ -1,0 +1,34 @@
+$kind: http-request
+name: "Messages - blog-ideas pinned model"
+method: POST
+url: "{{anthropic_base}}/v1/messages"
+order: 2000
+headers:
+  - key: "anthropic-version"
+    value: "2023-06-01"
+  - key: "content-type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "model": "{{anthropic_fast_model}}",
+      "max_tokens": 16,
+      "messages": [{"role": "user", "content": "Reply with the single word: ok"}]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Is a message with a text block', () => {
+        pm.expect(body.type).to.eql('message');
+        pm.expect(body.role).to.eql('assistant');
+        pm.expect(body.content[0].type).to.eql('text');
+      });
+      pm.test('Reports token usage', () => {
+        pm.expect(body.usage.input_tokens).to.be.a('number');
+        pm.expect(body.usage.output_tokens).to.be.a('number');
+      });
+      pm.test('Has a stop_reason', () => pm.expect(body.stop_reason).to.be.a('string'));

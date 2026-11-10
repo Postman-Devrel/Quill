@@ -1,0 +1,35 @@
+$kind: http-request
+name: "Search"
+method: POST
+url: "{{tavily_base}}/search"
+order: 1000
+headers:
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "api_key": "{{tavily_api_key}}",
+      "query": "Postman API platform",
+      "search_depth": "basic",
+      "max_results": 3,
+      "include_answer": false,
+      "include_images": false
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('results is a non-empty array', () => pm.expect(body.results).to.be.an('array').that.is.not.empty);
+      pm.test('Each result has the fields Quill reads', () => {
+        body.results.forEach((r) => {
+          pm.expect(r.title).to.be.a('string');
+          pm.expect(r.url).to.match(/^https?:\/\//);
+          pm.expect(r.content).to.be.a('string');
+          pm.expect(r.score).to.be.a('number');
+        });
+      });
+      pm.test('Honors max_results', () => pm.expect(body.results.length).to.be.at.most(3));

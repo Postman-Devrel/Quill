@@ -1,0 +1,17 @@
+$kind: http-request
+name: "Single post stats"
+method: GET
+url: "{{stats_base}}/stats/post/{{stats_post_id}}"
+order: 3000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Lifetime views is a number', () => pm.expect(body.views).to.be.a('number'));
+      pm.test('Daily data is [date, views] pairs', () => body.data.forEach((r) => { pm.expect(r[0]).to.be.a('string'); pm.expect(r[1]).to.be.a('number'); }));
+      pm.test('Embedded post has title, permalink, date', () => { pm.expect(body.post.post_title).to.be.a('string'); pm.expect(body.post.permalink).to.be.a('string'); pm.expect(body.post.post_date).to.be.a('string'); });

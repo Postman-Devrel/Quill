@@ -1,0 +1,17 @@
+$kind: http-request
+name: "Unauthenticated users/me is rejected"
+method: GET
+url: "{{wp_base}}/users/me"
+order: 2000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 401', () => pm.expect(pm.response.code).to.eql(401));
+      const body = pm.response.json();
+      pm.test('Code is a WP auth error', () => pm.expect(body.code).to.be.oneOf(['rest_not_logged_in', 'rest_cannot_access']));

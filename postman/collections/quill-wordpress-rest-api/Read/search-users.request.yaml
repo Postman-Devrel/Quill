@@ -1,0 +1,20 @@
+$kind: http-request
+name: "Search users (author resolution)"
+method: GET
+url: "{{wp_base}}/users?search=postman&per_page=10"
+order: 6000
+queryParams:
+  - key: "search"
+    value: "postman"
+  - key: "per_page"
+    value: "10"
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Users have id and name', () => body.forEach((x) => { pm.expect(x.id).to.be.a('number'); pm.expect(x.name).to.be.a('string'); }));

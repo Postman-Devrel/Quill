@@ -1,0 +1,15 @@
+$kind: http-request
+name: "About (token + identity)"
+method: GET
+url: "{{drive_base}}/about?fields=user"
+order: 1000
+queryParams:
+  - key: "fields"
+    value: "user"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Resolves to the service account', () => pm.expect(body.user.emailAddress).to.eql(pm.environment.get('google_service_account_email')));

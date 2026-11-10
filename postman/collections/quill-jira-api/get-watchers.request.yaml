@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Get watchers"
+method: GET
+url: "{{jira_base}}/rest/api/3/issue/{{jira_issue_key}}/watchers"
+order: 6000
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('watchers payload shape', () => { pm.expect(body.watchCount).to.be.a('number'); pm.expect(body.watchers).to.be.an('array'); });

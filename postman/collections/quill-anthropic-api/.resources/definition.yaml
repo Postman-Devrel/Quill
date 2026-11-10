@@ -1,0 +1,19 @@
+$kind: collection
+name: "Quill - Anthropic API"
+description: "Messages API as used by agent/lib/anthropic.ts (streaming, default model) and agent/tools/blog-ideas.ts (pinned Haiku). Costs a few tokens per run."
+variables:
+  - key: "anthropic_base"
+    value: "https://api.anthropic.com"
+  - key: "anthropic_default_model"
+    value: "claude-opus-4-7"
+  - key: "anthropic_fast_model"
+    value: "claude-haiku-4-5-20251001"
+auth:
+  type: apikey
+  credentials:
+    - key: "key"
+      value: "x-api-key"
+    - key: "value"
+      value: "{{anthropic_api_key}}"
+    - key: "in"
+      value: "header"

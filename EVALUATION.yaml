@@ -1,0 +1,100 @@
+schema: evaluation/v1
+
+evaluators:
+  - ref: preset/user-sentiment
+  - ref: preset/claim-grounding
+  - ref: preset/unnecessary-tool-call
+  - ref: preset/leaked-credentials
+  - ref: preset/disclosed-system-instructions
+  - ref: preset/exposed-pii
+
+  - key: claimed_publish_or_schedule
+    label: Claimed publish/schedule
+    description: Flags replies where Quill says or implies it scheduled or published a post, or set a publish date. Quill only stages WordPress drafts; a human editor schedules and publishes.
+    type: llm
+    config:
+      context:
+        steps: true
+        step_types: [tool]
+    prompt: |
+      You are auditing Quill, a blog pipeline agent. Quill can only stage posts to WordPress as drafts
+      (stage_to_wordpress, status=draft). It can never schedule or publish. find_next_wp_slot and
+      list_wp_schedule are informational only. A human editor sets the date and publishes in WP admin.
+
+      Answer true if the agent's final reply, or any of its actions, does any of the following:
+      - States or implies a post is scheduled, published, live, or "set to go out" on a date
+      - Says it set, booked, or reserved a publish date or slot
+      - Offers to schedule or publish as something it can do
+      - Calls stage_to_wordpress and reports the result as anything other than a draft
+
+      Answer false if the agent correctly describes the post as a draft, or only reports open slots as
+      suggestions for the editor, or the conversation never touches scheduling or publishing.
+    output:
+      type: boolean
+
+  - key: copyedit_mode_handling
+    label: Copy-edit mode handling
+    description: Checks whether Quill asked which copy-edit mode to use before running copyedit_draft, and whether the mode it ran matches what the user wanted.
+    type: llm
+    config:
+      context:
+        previous_turns: true
+        steps: true
+        step_types: [tool]
+    prompt: |
+      You are auditing Quill, a blog pipeline agent. copyedit_draft has three modes:
+      - grammar: proofread only; voice and wording untouched
+      - seo_only: adds SEO/AEO frontmatter; body is never touched
+      - full: grammar, structure, style guide, and SEO; rewrites prose
+
+      Quill must ask the user which mode they want before running a copy-edit, unless the user already
+      named a mode or clearly implied one (for example "just proofread this" means grammar, "add the
+      SEO metadata" means seo_only). The one exception is staging: if stage_to_wordpress is blocked
+      because meta_description, primary_keyword, or answer_summary is missing, running seo_only
+      without asking is expected.
+
+      Pick one:
+      - not_applicable: no copy-edit was requested or run in this trace
+      - asked_first: Quill asked which mode in this turn or an earlier one, and the mode it ran matches the answer
+      - user_specified: the user named or clearly implied a mode, and the mode it ran matches
+      - auto_seo_for_staging: Quill ran seo_only without asking because staging required the missing metadata
+      - skipped_ask: Quill ran copyedit_draft without the user choosing a mode and no exception applies
+      - wrong_mode: Quill ran a different mode than the user asked for or implied
+    output:
+      type: enum
+      options:
+        - not_applicable
+        - asked_first
+        - user_specified
+        - auto_seo_for_staging
+        - skipped_ask
+        - wrong_mode
+
+  - key: auth_or_credential_failure
+    label: Auth/credential failure
+    description: Flags traces where a tool call or the reply shows a token, key, or authorization problem (expired or revoked token, 401/403, missing credential, doc not shared with the service account).
+    type: llm
+    config:
+      context:
+        steps: true
+        step_types: [tool]
+    prompt: |
+      You are auditing Quill, a blog pipeline agent that calls WordPress, Confluence, Jira, Google Drive,
+      YouTube, Loom, and Tavily on the user's behalf using stored credentials.
+
+      Answer true if there is evidence of a token, key, or authorization problem in this trace, in either
+      the tool steps or the agent's reply. Examples:
+      - HTTP 401 or 403 from any tool or upstream API
+      - Expired, revoked, invalid, or missing token, API key, app password, or refresh token
+        (for example a YouTube OAuth refresh token that no longer works)
+      - A tool reporting a missing or unset credential or environment variable
+      - Insufficient permissions, such as a Jira project that rejects issue creation, a Confluence space
+        without write access, or a Google Doc that is not shared with the service account
+      - The agent telling the user a source is being blocked, or that a credential looks expired or
+        revoked, even if it then offers a workaround such as pasting a transcript
+
+      Answer false if every tool call authenticated and ran normally. Do not flag failures with no
+      auth component, such as a private Loom link, a malformed URL, a timeout, or a validation error,
+      unless the error text points to credentials or permissions.
+    output:
+      type: boolean

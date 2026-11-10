@@ -1,0 +1,13 @@
+$kind: http-request
+name: "Deleted draft is gone"
+method: GET
+url: "{{wp_base}}/posts/{{wp_test_post_id}}"
+order: 5000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 404', () => pm.expect(pm.response.code).to.eql(404));

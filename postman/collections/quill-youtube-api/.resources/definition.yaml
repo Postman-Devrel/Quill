@@ -1,0 +1,6 @@
+$kind: collection
+name: "Quill - YouTube (keyless player)"
+description: "The unofficial youtubei player call in agent/video/transcript.ts, against a public video. YouTube blocks some cloud IPs and changes client versions, so this is a canary, not a contract. The OAuth Data API is not covered (YOUTUBE_* not configured)."
+variables:
+  - key: "youtube_video_id"
+    value: "jNQXAC9IVRw"

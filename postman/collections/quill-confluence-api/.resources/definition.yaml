@@ -1,0 +1,15 @@
+$kind: collection
+name: "Quill - Confluence REST API (read)"
+description: "Read paths from agent/lib/confluence.ts. Write paths are in \"Quill - Confluence REST API (page lifecycle)\"."
+variables:
+  - key: "confluence_base"
+    value: "https://postmanlabs.atlassian.net/wiki"
+auth:
+  type: apikey
+  credentials:
+    - key: "key"
+      value: "Authorization"
+    - key: "value"
+      value: "Basic {{atlassian_basic_auth}}"
+    - key: "in"
+      value: "header"

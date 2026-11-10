@@ -1,0 +1,17 @@
+$kind: http-request
+name: "List files"
+method: GET
+url: "{{drive_base}}/files?pageSize=1&fields=files(id,name,mimeType)"
+order: 2000
+queryParams:
+  - key: "pageSize"
+    value: "1"
+  - key: "fields"
+    value: "files(id,name,mimeType)"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('files is an array', () => pm.expect(body.files).to.be.an('array'));

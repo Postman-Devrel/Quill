@@ -1,0 +1,33 @@
+$kind: http-request
+name: "Player - ANDROID client"
+method: POST
+url: "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
+order: 1000
+queryParams:
+  - key: "prettyPrint"
+    value: "false"
+headers:
+  - key: "Content-Type"
+    value: "application/json"
+  - key: "User-Agent"
+    value: "com.google.android.youtube/20.10.38 (Linux; U; Android 14)"
+body:
+  type: json
+  content: |-
+    {
+      "context": {"client": {"clientName": "ANDROID", "clientVersion": "20.10.38", "androidSdkVersion": 34, "hl": "en"}},
+      "videoId": "{{youtube_video_id}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('playabilityStatus.status is OK', () => pm.expect(body.playabilityStatus.status).to.eql('OK'));
+      pm.test('videoDetails.title present', () => pm.expect(body.videoDetails.title).to.be.a('string'));
+      pm.test('Caption tracks listed with https youtube baseUrl', () => {
+        const t = body.captions.playerCaptionsTracklistRenderer.captionTracks;
+        pm.expect(t).to.be.an('array').that.is.not.empty;
+        pm.expect(new URL(t[0].baseUrl).hostname).to.match(/youtube\.com$/);
+      });

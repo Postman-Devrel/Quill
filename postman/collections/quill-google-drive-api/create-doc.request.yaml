@@ -1,0 +1,40 @@
+$kind: http-request
+name: "Create Google Doc from HTML (multipart)"
+method: POST
+url: "{{drive_upload_base}}/files?uploadType=multipart&fields=id,name,webViewLink"
+order: 3000
+queryParams:
+  - key: "uploadType"
+    value: "multipart"
+  - key: "fields"
+    value: "id,name,webViewLink"
+headers:
+  - key: "Content-Type"
+    value: "multipart/related; boundary=quill-api-test"
+body:
+  type: text
+  content: |-
+    --quill-api-test
+    Content-Type: application/json; charset=UTF-8
+    
+    {"name":"[QUILL-API-TEST] safe to delete","mimeType":"application/vnd.google-apps.document"}
+    --quill-api-test
+    Content-Type: text/html; charset=UTF-8
+    
+    <h1>Quill API test</h1><p>Automated check.</p>
+    --quill-api-test--
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      const meta = { name: '[QUILL-API-TEST] safe to delete', mimeType: 'application/vnd.google-apps.document' };
+      const folder = pm.variables.get('google_drive_folder_id');
+      if (folder) meta.parents = [folder];
+      pm.request.body.update({ mode: 'raw', raw: '--quill-api-test\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n--quill-api-test\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n<h1>Quill API test</h1><p>Automated check.</p>\r\n--quill-api-test--' });
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Doc created with id and webViewLink', () => { pm.expect(body.id).to.be.a('string'); pm.expect(body.webViewLink).to.include('docs.google.com'); });
+      pm.collectionVariables.set('drive_test_file_id', body.id);

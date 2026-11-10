@@ -1,0 +1,25 @@
+$kind: http-request
+name: "Add comment (reply-confluence-comment)"
+method: POST
+url: "{{confluence_base}}/rest/api/content"
+order: 3000
+headers:
+  - key: "Accept"
+    value: "application/json"
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "type": "comment",
+      "container": {"id": "{{confluence_test_page_id}}", "type": "page"},
+      "body": {"storage": {"value": "<p>Test comment.</p>", "representation": "storage"}}
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Comment created', () => pm.expect(body.type).to.eql('comment'));

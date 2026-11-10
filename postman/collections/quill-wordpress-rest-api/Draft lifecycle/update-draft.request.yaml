@@ -1,0 +1,25 @@
+$kind: http-request
+name: "Update draft (stage-to-wordpress update path)"
+method: POST
+url: "{{wp_base}}/posts/{{wp_test_post_id}}"
+order: 2000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "title": "[QUILL-API-TEST] updated",
+      "status": "draft"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Title updated', () => pm.expect(body.title.rendered).to.include('updated'));
+      pm.test('Still a draft', () => pm.expect(body.status).to.eql('draft'));

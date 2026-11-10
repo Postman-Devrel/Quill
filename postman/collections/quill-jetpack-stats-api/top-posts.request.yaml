@@ -1,0 +1,30 @@
+$kind: http-request
+name: "Top posts (30 days)"
+method: GET
+url: "{{stats_base}}/stats/top-posts?period=day&num=30&date={{stats_end}}&max=100&summarize=1"
+order: 2000
+queryParams:
+  - key: "period"
+    value: "day"
+  - key: "num"
+    value: "30"
+  - key: "date"
+    value: "{{stats_end}}"
+  - key: "max"
+    value: "100"
+  - key: "summarize"
+    value: "1"
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      const posts = body.summary.postviews;
+      pm.test('postviews is a non-empty array', () => pm.expect(posts).to.be.an('array').that.is.not.empty);
+      pm.test('Each entry has id, href, title, views', () => posts.forEach((p) => { pm.expect(p.id).to.be.a('number'); pm.expect(p.href).to.be.a('string'); pm.expect(p.title).to.be.a('string'); pm.expect(p.views).to.be.a('number'); }));
+      const real = posts.find((p) => p.id > 0);
+      if (real) pm.collectionVariables.set('stats_post_id', String(real.id));

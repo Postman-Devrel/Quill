@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Unauthenticated request is rejected"
+method: GET
+url: "{{stats_base}}/stats/visits"
+order: 6000
+headers:
+  - key: "User-Agent"
+    value: "{{wp_user_agent}}"
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 401 or 403', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));

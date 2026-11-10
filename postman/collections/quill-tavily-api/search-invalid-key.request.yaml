@@ -1,0 +1,24 @@
+$kind: http-request
+name: "Search - invalid key is rejected"
+method: POST
+url: "{{tavily_base}}/search"
+order: 2000
+headers:
+  - key: "Content-Type"
+    value: "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "api_key": "tvly-invalid-key-for-test",
+      "query": "Postman API platform",
+      "search_depth": "basic",
+      "max_results": 3,
+      "include_answer": false,
+      "include_images": false
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 401', () => pm.expect(pm.response.code).to.eql(401));

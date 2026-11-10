@@ -1,0 +1,86 @@
+name: API tests
+
+# Runs Quill's external-API collections (postman/collections) against the LIVE services on every push.
+# These are real calls: they use real credentials, spend a few Anthropic/Tavily tokens, and the
+# WordPress / Drive / Confluence lifecycle tests create a [QUILL-API-TEST] item and delete it again.
+on:
+  push:
+  workflow_dispatch: {}
+
+# Queue rather than cancel: cancelling mid-run could skip a cleanup (delete) step.
+concurrency:
+  group: api-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  POSTMAN_CLI_VERSION: "1.75.0"
+
+jobs:
+  lint:
+    name: Lint collections and environment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Postman CLI
+        run: npm install -g "postman-cli@${POSTMAN_CLI_VERSION}"
+      - name: Lint collections
+        run: |
+          for c in postman/collections/*/; do
+            echo "== $c"
+            postman collection lint "$c" -f error
+          done
+      - name: Lint environment
+        run: postman environment lint postman/environments --fail-severity warning
+
+  test:
+    name: ${{ matrix.collection }}
+    needs: lint
+    runs-on: ubuntu-latest
+    # A non-blocking entry still runs and reports its failures in the log; it just doesn't fail the workflow.
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { collection: quill-anthropic-api, allow_failure: false }
+          - { collection: quill-tavily-api, allow_failure: false }
+          - { collection: quill-wordpress-rest-api, allow_failure: false }
+          - { collection: quill-jetpack-stats-api, allow_failure: false }
+          - { collection: quill-confluence-api, allow_failure: false }
+          - { collection: quill-confluence-api-page-lifecycle, allow_failure: false }
+          - { collection: quill-jira-api, allow_failure: false }
+          # Fails today: service accounts have no Drive storage quota. Set GOOGLE_DRIVE_FOLDER_ID to a
+          # folder in a shared drive, then flip this to false.
+          - { collection: quill-google-drive-api, allow_failure: true }
+          # Unofficial endpoint that YouTube blocks from cloud IPs; a canary, not a gate.
+          - { collection: quill-youtube-api, allow_failure: true }
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      WP_USERNAME: ${{ secrets.WP_USERNAME }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      CONFLUENCE_EMAIL: ${{ secrets.CONFLUENCE_EMAIL }}
+      CONFLUENCE_API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+      CONFLUENCE_SPACE_KEY: ${{ secrets.CONFLUENCE_SPACE_KEY }}
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+      GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+      GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Postman CLI
+        run: npm install -g "postman-cli@${POSTMAN_CLI_VERSION}"
+      - name: Run ${{ matrix.collection }}
+        run: scripts/api-tests/run.sh "${{ matrix.collection }}"
+      - name: Upload run summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-summary-${{ matrix.collection }}
+          path: postman/reports/
+          if-no-files-found: ignore

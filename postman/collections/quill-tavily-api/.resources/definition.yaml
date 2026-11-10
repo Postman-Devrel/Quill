@@ -1,0 +1,6 @@
+$kind: collection
+name: "Quill - Tavily API"
+description: "Web search used by agent/tools/web-search.ts. Key is sent in the JSON body, as Quill does."
+variables:
+  - key: "tavily_base"
+    value: "https://api.tavily.com"

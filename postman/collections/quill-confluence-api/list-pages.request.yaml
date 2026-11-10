@@ -1,0 +1,21 @@
+$kind: http-request
+name: "List pages"
+method: GET
+url: "{{confluence_base}}/rest/api/content?type=page&limit=1"
+order: 3000
+queryParams:
+  - key: "type"
+    value: "page"
+  - key: "limit"
+    value: "1"
+headers:
+  - key: "Accept"
+    value: "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Status is 200', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.test('Returns a page with id and title', () => { pm.expect(body.results).to.have.lengthOf(1); pm.expect(body.results[0].id).to.be.a('string'); pm.expect(body.results[0].title).to.be.a('string'); });
+      pm.collectionVariables.set('confluence_page_id', body.results[0].id);
